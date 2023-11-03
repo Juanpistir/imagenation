@@ -1,0 +1,81 @@
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IMAGENATION</title>
+    <link rel="icon" type="image/x-icon" href="/public/img/favicon.ico">
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.2/dist/darkly/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
+      integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA=="
+      crossorigin="anonymous"
+      referrerpolicy="no-referrer"
+    />
+
+    <link href="/public/css/styles.css" rel="stylesheet" />
+
+  </head>
+  <body>
+
+
+    <!-- CUERPO -->
+
+    <div class="container p-4 ">
+      <a class="navbar-brand " href="/">
+            <img class="mb-2" style="width: 50%; border-radius: 35%; " src="/public/img/Logo.jpg" alt="imagenation" />
+          </a>
+      <div class="row">
+        <div class="col-md-8">
+          {{{body}}}
+        </div>
+
+        <!-- BARRA LATERAL  -->
+
+        <div class="col-md-4">
+
+          <!-- FORMULARIO DE BÚSQUEDA -->
+            <form class="d-flex" role="search" action="/image/search" method="GET">
+              <input
+                class="form-control me-2"
+                type="search"
+                placeholder="Buscar Imágenes"
+                name="title"
+                aria-label="Search"
+              />
+              <button class="btn btn-primary" type="submit">Buscar</button>
+            </form>
+              <!-- RESULTADOS DE BÚSQUEDA -->
+
+                <div id="searchResults">
+                </div>
+
+          <!-- INFORMACIÓN -->
+
+          {{>stats}}
+          {{>popular}}
+          {{>comments}}
+        </div>
+      </div>
+    </div>
+
+    <!-- SCRIPTS -->
+
+    <!-- Obtenemos jquey cdn uncompressed, para hacer uso de las funcionalidades de esta en otro script  -->
+
+    <script
+      src="https://code.jquery.com/jquery-3.7.1.js"
+      integrity="sha256-eKhayi8LEQwp4NKxN+CfCh+3qOVUtJn3QNZ0TciWLP4="
+      crossorigin="anonymous"
+    ></script>
+
+    <!-- CUSTOM SCRIPT, se hace uso de un script hecho por nosotros mismos -->
+
+    <script src="/public/js/scripts.js"></script>
+    <script src="/public/js/search.js"></script>
+
+  </body>
+</html>
