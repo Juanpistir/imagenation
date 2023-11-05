@@ -22,6 +22,3 @@ const connectDB = () => {
       app.listen(PORT, () => console.log("Servidor en puerto ", PORT));
     })
     .catch((err) => console.error(err));
-
-
-    
