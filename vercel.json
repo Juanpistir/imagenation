@@ -1,15 +1,11 @@
 {
-  "version": 2,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/" }
-  ],
-  "routes": [
-    {
-      "src": "/images/:image_id/(.*)",
-      "dest": "/src/routes/index.js"
-    },
-    {
-      "handle": "filesystem"
-    }
+    { "source": "/", "destination": "/src/controllers/home.js" },
+    { "source": "/images/:image_id", "destination": "/src/controllers/image.js" },
+    { "source": "/images", "destination": "/src/controllers/image.js" },
+    { "source": "/images/:image_id/like", "destination": "/src/controllers/image.js" },
+    { "source": "/images/:image_id/comment", "destination": "/src/controllers/image.js" },
+    { "source": "/images/:image_id", "destination": "/src/controllers/image.js" },
+    { "source": "/image/search", "destination": "/src/controllers/image.js" }
   ]
 }
