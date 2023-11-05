@@ -6,7 +6,9 @@ const multer = require("multer");
 const express = require("express");
 const routes = require("../routes/index");
 const erroHandle = require("errorhandler")
+const serverless = require('serverless-http');
 const Handlebars = require('handlebars')
+const app = require("./config")();
 const {allowInsecurePrototypeAccess} = require('@handlebars/allow-prototype-access')
 
 module.exports = (app) => {
@@ -50,6 +52,10 @@ module.exports = (app) => {
   if ("development" === app.get("env")){
     app.use(erroHandle)
   }
+
+
+
+  module.exports.handler = serverless(app);
 
   return app;
 };
