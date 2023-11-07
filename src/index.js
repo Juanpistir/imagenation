@@ -7,12 +7,13 @@ const router = express.Router();
 const home = require("./controllers/home");
 const image = require("./controllers/image");
 const Handlebars = require("handlebars");
-const app = express();
 const mongoose = require("mongoose");
 const {allowInsecurePrototypeAccess} = require('@handlebars/allow-prototype-access');
 errorHandle = require("errorhandler");
 const multer = require("multer");
 
+const app = express();
+app.use(favicon(__dirname + '/public/favicon.ico'));
 
 mongoose.set("strictQuery", false);
 
