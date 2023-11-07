@@ -1,11 +1,22 @@
 {
-  "rewrites": [
-    { "source": "/", "destination": "/src/controllers/home.js" },
-    { "source": "/images/:image_id", "destination": "/src/controllers/image.js" },
-    { "source": "/images", "destination": "/src/controllers/image.js" },
-    { "source": "/images/:image_id/like", "destination": "/src/controllers/image.js" },
-    { "source": "/images/:image_id/comment", "destination": "/src/controllers/image.js" },
-    { "source": "/images/:image_id", "destination": "/src/controllers/image.js" },
-    { "source": "/image/search", "destination": "/src/controllers/image.js" }
-  ]
+  "version": 2,
+  "name": "my-app",
+  "builds": [
+    {
+      "src": "index.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "index.js"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  },
+  "engines": {
+    "node": "14.x"
+  }
 }
