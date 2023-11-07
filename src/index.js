@@ -11,8 +11,11 @@ const mongoose = require("mongoose");
 const {allowInsecurePrototypeAccess} = require('@handlebars/allow-prototype-access');
 errorHandle = require("errorhandler");
 const multer = require("multer");
+const favicon = require('express-favicon');
+
 
 const app = express();
+const PORT = process.env.PORT || 3000
 app.use(favicon(__dirname + '/public/favicon.ico'));
 
 mongoose.set("strictQuery", false);
@@ -29,12 +32,15 @@ const connectDB = async () => {
   }
 };
 
-connectDB();
-
-app.set("port", process.env.PORT || 3000);
-const PORT = app.get("port");
+connectDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  })
+});
 
 app.set("views", path.join(__dirname, "./views"));
+
+
 
 app.engine(
   ".hbs",
@@ -71,6 +77,3 @@ if (app.get("env") === "development") {
   app.use(errorHandle);
 }
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
