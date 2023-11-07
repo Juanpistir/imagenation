@@ -1,11 +1,20 @@
-const { Image } = require("../models"); //Importamos las imagenes de la base de datos.
+const { Image } = require("../models");
+const { SafeString } = require("handlebars");
 
 module.exports = {
-  //Función que luego llamaremos en sidebar para que sea pasada a los controladores.
   async popular() {
-    const images = await Image.find() //Hacemos una consulta a la base de datos de imagenes
-      .limit(9) //el limite de la consulta son 9, osea solo requerimos 9 imagenes
-      .sort({ likes: -1 }); //las ordenamos por likes de más a menos.
-    return images; //retornamos las imagenes consultadas
+    const images = await Image.find()
+      .limit(9)
+      .sort({ likes: -1 })
+
+    for (let i = 0; i < images.length; i++) {
+      // Convierte el contenido de la imagen a base64
+      const base64 = Buffer.from(images[i].image.data).toString('base64');
+
+      // Añade el tipo de contenido al inicio de la cadena base64
+      images[i].imgSrc = new SafeString(`data:${images[i].image.contentType};base64,${base64}`);
+    }
+
+    return images;
   },
 };

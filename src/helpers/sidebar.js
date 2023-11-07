@@ -21,3 +21,4 @@ module.exports = async (viewModel) => {
 
   return viewModel; // Es necesario poner el .sidebar para que permita mostrar los datos de lo contrario muestra [Object, object]
 };
+

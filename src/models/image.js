@@ -6,6 +6,7 @@ const path = require("path");
 const ImageSchema = new Schema({
   title: { type: String },
   description: { type: String },
+  image: { data: Buffer, contentType: String },
   filename: { type: String },
   views: { type: Number, default: 0 },
   likes: { type: Number, default: 0 },

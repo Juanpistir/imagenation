@@ -16,12 +16,16 @@ const viewsCounter = async () => {
         {
             $group: {
                 _id: "1",
-                vistas: { $sum: "$views" }
+                views: { $sum: "$views" }
             }
         }
     ]);
 
-    const views = result[0].vistas;
+    if (result.length === 0) {
+        return 0;
+    }
+
+    const views = result[0].views;
     myCache.set("views", views); // Guardar en caché
     return views;
 };
@@ -40,6 +44,10 @@ const likesCounter = async () => {
             }
         }
     ]);
+
+    if (result.length === 0) {
+        return 0;
+    }
 
     const likes = result[0].likesTotal;
     myCache.set("likes", likes); // Guardar en caché

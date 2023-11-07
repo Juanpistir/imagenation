@@ -22,19 +22,20 @@ $(document).ready(function () {
 
   function displaySearchResults(response) {
     const images = response.results; // Extrae las imágenes del objeto JSON recibido
-  
+
     if (images && images.length > 0) {
       searchResults.html(""); // Limpiar resultados anteriores
-  
-      images.forEach(image => {
+
+      images.forEach((image) => {
         const imageDiv = $('<div class="image-info" style="margin: 10px;">');
         const imageLink = $(`<a href="/images/${image.filename}"></a>`);
         const imageElement = $("<img>");
 
-        imageElement.attr("src", `/public/upload/${image.filename}`);
+        // Usa imgSrc en lugar de la ruta al archivo
+        imageElement.attr("src", image.imgSrc);
         imageElement.attr("alt", image.title);
-        imageElement.addClass("img-thumbnail"); 
-        imageElement.css("width", "100px"); 
+        imageElement.addClass("img-thumbnail");
+        imageElement.css("width", "100px");
 
         const title = $(`<h4>${image.title}</h4>`);
         const description = $(`<p>${image.description}</p>`);
@@ -44,11 +45,9 @@ $(document).ready(function () {
         imageDiv.append(title);
         imageDiv.append(description);
         searchResults.append(imageDiv);
-
-    });
-} else {
-    searchResults.html('<p class="ml-3">No se encontraron imágenes</p>');
-}
+      });
+    } else {
+      searchResults.html('<p class="ml-3">No se encontraron imágenes</p>');
+    }
   }
-  
 });

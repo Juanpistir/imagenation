@@ -1,25 +1,12 @@
 const path = require("path");
-const { randonNumber } = require("../helpers/libs"); // Modulo que creamos para generar numero aleatorio.
-const fs = require("fs-extra"); // Modulo Filesystem más avanzado que permite eliminar, renombrar archivos y más.
-const md5 = require("md5"); // Modulo que permite generar avatars aleatorias
+const { randonNumber } = require("../helpers/libs");
+const md5 = require("md5"); //
 const { updateCache } = require("../helpers/stats");
-const { Image, Comment } = require("../models"); //Importamos el modelo Image y el modelo Comment
+const { Image, Comment } = require("../models");
 const sidebar = require("../helpers/sidebar");
-
-const MAX_FILE_SIZE = 1 * 1024 * 1024;
+const { SafeString } = require("handlebars");
 
 const ctrl = {};
-
-const checkFileSize = (req, res, next) => {
-  if (req.file && req.file.size > MAX_FILE_SIZE) {
-    fs.unlinkSync(req.file.path); // Elimina el archivo si excede el tamaño permitido
-    const errorMessage = "El archivo excede el tamaño permitido";
-    return res.send(
-      `<script>alert('${errorMessage}'); window.history.back();</script>`
-    );
-  }
-  next();
-};
 
 ctrl.index = async (req, res) => {
   let viewModel = { images: {}, comments: {} };
@@ -29,12 +16,19 @@ ctrl.index = async (req, res) => {
   });
 
   if (image) {
+    // Convierte el contenido de la imagen a base64
+    const base64 = Buffer.from(image.image.data).toString('base64');
+
+    // Añade el tipo de contenido al inicio de la cadena base64
+    const imgSrc = new SafeString(`data:${image.image.contentType};base64,${base64}`);
+
     const comments = await Comment.find({ image_id: image._id });
     image.views = image.views + 1;
     viewModel.comments = comments;
     await image.save();
     updateCache();
-    viewModel.image = image;
+    viewModel.imageSrc = imgSrc; // Cambia esto para usar imgSrc en lugar de image
+    viewModel.image = image; // Añade esto para mantener una referencia al objeto image original// Cambia esto para usar imgSrc en lugar de image
     viewModel = await sidebar(viewModel);
     res.render("image", viewModel);
   } else {
@@ -42,55 +36,52 @@ ctrl.index = async (req, res) => {
   }
 };
 
+
+
+
 ctrl.create = async (req, res) => {
-  checkFileSize(req, res, async () => {
-    const saveImage = async () => {
-      const imgUrl = randonNumber(); // Genera el nombre de archivo aleatorio
+  const saveImage = async () => {
+    const imgUrl = randonNumber(); // Genera el nombre de archivo aleatorio
 
-      const existingImages = await Image.find({ filename: imgUrl });
-      if (existingImages.length > 0) {
-        saveImage(); // Si el nombre del archivo ya existe, intenta generar uno nuevo
-      } else {
-        const ext = path.extname(req.file.originalname).toLowerCase();
-        if (
-          ext !== ".png" &&
-          ext !== ".jpg" &&
-          ext !== ".jpeg" &&
-          ext !== ".gif"
-        ) {
-          fs.unlinkSync(req.file.path); // Elimina el archivo si no es un tipo permitido
-          const errorMessage = "Solo imágenes permitidas";
-          return res.send(
-            `<script>alert('${errorMessage}'); window.history.back();</script>`
-          );
-        }
-
-        const targetPath = path.resolve(`src/public/upload/${imgUrl}${ext}`);
-
-        try {
-          // Mueve el archivo a la ubicación deseada
-          await fs.rename(req.file.path, targetPath);
-
-          // Crea una nueva imagen en la base de datos
-          const newImage = new Image({
-            title: req.body.title,
-            filename: imgUrl + ext,
-            description: req.body.description,
-          });
-          const imageSaved = await newImage.save();
-          updateCache();
-          res.redirect("/images/" + imgUrl);
-        } catch (error) {
-          console.error("Error al subir la imagen:", error);
-          res.status(500).send("Error al subir la imagen");
-        }
+    const existingImages = await Image.find({ filename: imgUrl });
+    if (existingImages.length > 0) {
+      // Si el nombre del archivo ya existe, intenta generar uno nuevo
+      return saveImage();
+    } else {
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      if (
+        ext !== ".png" &&
+        ext !== ".jpg" &&
+        ext !== ".jpeg" &&
+        ext !== ".gif"
+      ) {
+        const errorMessage = "Solo imágenes permitidas";
+        return res.send(
+          `<script>alert('${errorMessage}'); window.history.back();</script>`
+        );
       }
-    };
 
-    await saveImage();
-  });
+      try {
+        const newImage = new Image({
+          title: req.body.title,
+          image: { data: req.file.buffer, contentType: req.file.mimetype }, // { data: Buffer, contentType: String
+          filename: imgUrl + ext,
+          description: req.body.description,
+        });
+        await newImage.save();
+        updateCache();
+        res.redirect("/images/" + imgUrl);
+      } catch (error) {
+        console.error("Error al subir la imagen:", error);
+        res.status(500).send("Error al subir la imagen");
+      }
+    }
+  };
+
+  // Espera a que saveImage se complete antes de continuar
+  await saveImage();
 };
-// Controlador de likes
+  // Controlador de likes
 
 ctrl.like = async (req, res) => {
   // lo siguiente sirve para que busque todas las imagenes que cumplen con id que se le esta pasando por la ruta
@@ -138,8 +129,6 @@ ctrl.remove = async (req, res) => {
     });
 
     if (image) {
-      await fs.unlink(path.resolve("./src/public/upload/" + image.filename)); // Elimina el archivo de la imagen
-
       // Elimina los comentarios asociados a la imagen
       await Comment.deleteMany({ image_id: image._id });
 
@@ -163,9 +152,25 @@ ctrl.searchByTitle = async (req, res) => {
     const images = await Image.find({
       title: { $regex: searchTerm, $options: "i" },
     });
-    //console.log(images);
-    res.json({ results: images });
-   //res.render('main.hbs', { results: images });
+
+    const results = images.map(image => {
+      // Convierte el contenido de la imagen a base64
+      const base64 = Buffer.from(image.image.data).toString('base64');
+
+      // Crea un nuevo objeto con las propiedades que necesitamos
+      return {
+        _id: image._id,
+        title: image.title,
+        description: image.description,
+        filename: image.filename,
+        views: image.views,
+        likes: image.likes,
+        timestamp: image.timestamp,
+        imgSrc: `data:${image.image.contentType};base64,${base64}`,
+      };
+    });
+
+    res.json({ results });
   } catch (error) {
     res.status(500).json({ error: "Error al buscar imágenes por título" });
   }
