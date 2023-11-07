@@ -16,7 +16,7 @@ const favicon = require('express-favicon');
 
 const app = express();
 const PORT = process.env.PORT || 3000
-app.use(favicon(__dirname + '/public/favicon.ico'));
+app.use(favicon('./public/favicon.ico'));
 
 mongoose.set("strictQuery", false);
 
