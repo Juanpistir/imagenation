@@ -11,12 +11,14 @@ const mongoose = require("mongoose");
 const {allowInsecurePrototypeAccess} = require('@handlebars/allow-prototype-access');
 errorHandle = require("errorhandler");
 const multer = require("multer");
+var favicon = require('express-favicon');
 
 
 const app = express();
 const PORT = process.env.PORT || 3000
 
-mongoose.set("strictQuery", false);
+app.use(express.static('public'));
+app.use(favicon(__dirname + '/public/favicon.ico'));
 
 const connectDB = async () => {
   try {
@@ -68,7 +70,6 @@ router.post("/images/:image_id/comment", image.comment);
 router.delete("/images/:image_id", image.remove);
 router.get("/image/search", image.searchByTitle);
 
-app.use("/public", express.static(path.join(__dirname, "./public")));
 app.use(router);
 
 if (app.get("env") === "development") {
