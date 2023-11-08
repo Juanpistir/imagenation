@@ -76,3 +76,8 @@ if (app.get("env") === "development") {
   app.use(errorHandle);
 }
 
+app.use(function(err, req, res, next) {
+  console.error(err.stack); // Log error stack to console
+  res.status(500).send('Internal Server Error');
+});
+
