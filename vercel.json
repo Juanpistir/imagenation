@@ -1,5 +1,4 @@
 {
-  "version": 2,
   "name": "my-app",
   "builds": [
     {
@@ -12,8 +11,5 @@
       "src": "/(.*)",
       "dest": "index.js"
     }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 }
