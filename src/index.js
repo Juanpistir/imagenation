@@ -18,7 +18,7 @@ const app = express();
 const PORT = process.env.PORT || 3000
 
 app.use(express.static('public'));
-app.use(favicon(__dirname + '/public/favicon.ico'));
+app.use(favicon(__dirname + '/public/img/favicon.ico'));
 
 const connectDB = async () => {
   try {
