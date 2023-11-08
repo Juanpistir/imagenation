@@ -36,8 +36,8 @@ connectDB().then(() => {
   })
 });
 
-app.use("/", express.static(__dirname));
 app.set("views", path.join(__dirname, "./views"));
+
 
 
 app.engine(
@@ -68,6 +68,7 @@ router.post("/images/:image_id/comment", image.comment);
 router.delete("/images/:image_id", image.remove);
 router.get("/image/search", image.searchByTitle);
 
+app.use("/public", express.static(path.join(__dirname, "./public")));
 app.use(router);
 
 if (app.get("env") === "development") {
