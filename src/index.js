@@ -41,6 +41,11 @@ connectDB().then(() => {
 app.set("views", path.join(__dirname, "./views"));
 
 
+app.use(function(err, req, res, next) {
+  console.error(err.stack); // Log error stack to console
+  res.status(500).send('Internal Server Error');
+});
+
 
 app.engine(
   ".hbs",
@@ -75,9 +80,4 @@ app.use(router);
 if (app.get("env") === "development") {
   app.use(errorHandle);
 }
-
-app.use(function(err, req, res, next) {
-  console.error(err.stack); // Log error stack to console
-  res.status(500).send('Internal Server Error');
-});
 
