@@ -11,14 +11,14 @@ const mongoose = require("mongoose");
 const {allowInsecurePrototypeAccess} = require('@handlebars/allow-prototype-access');
 errorHandle = require("errorhandler");
 const multer = require("multer");
-var favicon = require('express-favicon');
+//var favicon = require('express-favicon');
 
 
 const app = express();
 const PORT = process.env.PORT || 3000
 
 app.use(express.static(path.join(__dirname, "public")));
-app.use(favicon(__dirname + '/public/img/favicon.ico'));
+//app.use(favicon(__dirname + '/public/img/favicon.ico'));
 
 const connectDB = async () => {
   try {
