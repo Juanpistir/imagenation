@@ -11,12 +11,10 @@ const mongoose = require("mongoose");
 const {allowInsecurePrototypeAccess} = require('@handlebars/allow-prototype-access');
 errorHandle = require("errorhandler");
 const multer = require("multer");
-const favicon = require('express-favicon');
 
 
 const app = express();
 const PORT = process.env.PORT || 3000
-app.use(favicon('./public/favicon.ico'));
 
 mongoose.set("strictQuery", false);
 
