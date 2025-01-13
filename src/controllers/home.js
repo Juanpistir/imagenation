@@ -1,31 +1,18 @@
-ctrl = {};
+const { Images } = require('../models');
+const stats = require('../helpers/stats');
 
-const { Image } = require("../models");
-const sidebar = require("../helpers/sidebar");
-const { SafeString } = require("handlebars");
-
-ctrl.index = async (req, res) => {
-  const images = await Image.find().sort({ timestamp: -1 });
-  
-  let viewModel = { images: [] };
-
-  for (let image of images) {
-    // Convierte el contenido de la imagen a base64
-    const base64 = Buffer.from(image.image.data).toString('base64');
-
-    // Añade el tipo de contenido al inicio de la cadena base64
-    const imgSrc = new SafeString(`data:${image.image.contentType};base64,${base64}`);
-
-    viewModel.images.push({
-      _id: image._id,
-      imgSrc: imgSrc,
-      ...image.toObject({ virtuals: true }) // Añade las propiedades virtuales y demás propiedades del objeto image
-    });
+const homeController = {
+  async index(req, reply) {
+    try {
+      const images = await Images.find();
+      const viewModel = { images };
+      
+      return reply.view('index', await stats.getSidebar(viewModel));
+    } catch (error) {
+      req.log.error(error);
+      throw new Error('Error cargando la página principal');
+    }
   }
-
-  viewModel = await sidebar(viewModel);
-
-  res.render("index", viewModel);
 };
 
-module.exports = ctrl;
+module.exports = homeController;

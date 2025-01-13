@@ -1,0 +1,59 @@
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h2 class="text-center mb-4">Registro</h2>
+                <form id="registerForm" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Nombre de usuario</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                        <div class="invalid-feedback">
+                            El nombre de usuario es requerido
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                        <div class="invalid-feedback">
+                            Por favor ingresa un email válido
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Contraseña</label>
+                        <input type="password" class="form-control" id="password" name="password" 
+                               required minlength="6">
+                        <div class="invalid-feedback">
+                            La contraseña debe tener al menos 6 caracteres
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Registrarse</button>
+                    </div>
+                    <div id="errorMessage" class="alert alert-danger mt-3 d-none"></div>
+                </form>
+                <div class="text-center mt-3">
+                    <p>¿Ya tienes cuenta? <a href="/login">Inicia Sesión</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const username = document.getElementById('username').value;
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const errorMessage = document.getElementById('errorMessage');
+
+    try {
+        await register(username, email, password);
+        // El token se manejará automáticamente a través de onAuthStateChanged
+    } catch (error) {
+        errorMessage.textContent = 'Error en el registro: ' + error.message;
+        errorMessage.classList.remove('d-none');
+    }
+});
+</script>

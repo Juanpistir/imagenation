@@ -1,76 +1,39 @@
-<div class="card">
-  <div class="card-header bg-azulSec">
-    <h3 class="card-title text-black">
-      <i class="fa-solid fa-camera-retro"></i>
-      Sube una imagen
-    </h3>
-  </div>
-  <div class="card-body">
-    <div class="container">
-      <form
-        method="POST"
-        action="/images"
-        enctype="multipart/form-data"
-        class="m-2"
-      >
-        <div class="form-group m-2">
-          <label for="imagen">Imagen:</label>
-          <input
-            type="file"
-            name="image"
-            id="imagen"
-            class="form-control"
-            required
-          />
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h3 class="h5 mb-0"><i class="fas fa-upload me-2"></i>Subir imagen</h3>
+            </div>
+            <div class="card-body">
+                <form action="/images" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <input type="text" name="title" class="form-control" placeholder="Título de la imagen" required>
+                    </div>
+                    <div class="mb-3">
+                        <textarea name="description" rows="2" class="form-control" placeholder="Descripción de la imagen" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <input type="file" name="image" class="form-control" accept="image/*" required>
+                    </div>
+                    <button class="btn btn-primary w-100">
+                        <i class="fas fa-cloud-upload-alt me-2"></i>Subir
+                    </button>
+                </form>
+            </div>
         </div>
-        <div class="form-group m-2">
-          <label for="title">Título de la Imagen:</label>
-          <input
-            type="text"
-            name="title"
-            id="titulo"
-            class="form-control"
-            required
-          />
-        </div>
-        <div class="form-group m-2">
-          <label for="description">Descripción:</label>
-          <textarea
-            name="description"
-            id="description"
-            class="form-control"
-            rows="4"
-          ></textarea>
-        </div>
-        <button type="submit" class="btn m-2 bg-azulSec text-black"><i
-            class="fa fa-upload"
-          ></i>
-          Subir</button>
-      </form>
+        {{> stats}}
     </div>
-
-  </div>
-
-</div>
-
-<div class="card mt-2 mb-2">
-  <div class="card-header bg-azulSec text-black">
-    <h3><i class="far fa-images"></i> Subidas Recientes</h3>
-  </div>
-
-  <div class="card-body">
-    <div class="row">
-      {{#each images}}
-        <div class="col-sm-6 col-md-4 mb-2">
-          <a href="/images/{{uniqueId}}">
-            <img
-              src="{{imgSrc}}"
-              alt="Image"
-              class="img-thumbnail w-70"
-            />
-          </a>
+    
+    <div class="col-md-8">
+        <h2 class="mb-4"><i class="far fa-images me-2"></i>Galería reciente</h2>
+        <div class="card-columns">
+            {{#each images}}
+                {{> image-card this}}
+            {{else}}
+                <div class="alert alert-info"></div>
+                    <i class="fas fa-info-circle me-2"></i>No hay imágenes aún
+                </div>
+            {{/each}}
         </div>
-      {{/each}}
     </div>
-  </div>
 </div>

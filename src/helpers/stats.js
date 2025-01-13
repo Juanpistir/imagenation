@@ -1,78 +1,66 @@
-const NodeCache = require("node-cache");
-const myCache = new NodeCache({ stdTTL: 100, checkperiod: 120 });
+const NodeCache = require('node-cache');
+const { db } = require('../config/firebase.config');
 
-const { Comment, Image } = require("../models");
+const statsCache = new NodeCache({ stdTTL: 300 });
 
-const imageCounter = () => Image.countDocuments();
-const commentsCounter = () => Comment.countDocuments();
-
-const viewsCounter = async () => {
-    const viewsCached = myCache.get("views");
-    if (viewsCached) {
-        return viewsCached;
-    }
-
-    const result = await Image.aggregate([
-        {
-            $group: {
-                _id: "1",
-                views: { $sum: "$views" }
-            }
+const stats = {
+    async getStats() {
+        if (statsCache.has('stats')) {
+            return statsCache.get('stats');
         }
-    ]);
 
-    if (result.length === 0) {
-        return 0;
-    }
+        try {
+            const [imagesSnap, commentsSnap] = await Promise.all([
+                db.collection('images').get(),
+                db.collection('comments').get()
+            ]);
 
-    const views = result[0].views;
-    myCache.set("views", views); // Guardar en caché
-    return views;
-};
+            const stats = {
+                images: imagesSnap.size,
+                comments: commentsSnap.size,
+                views: imagesSnap.docs.reduce((acc, doc) => acc + (doc.data().views || 0), 0),
+                likes: imagesSnap.docs.reduce((acc, doc) => acc + (doc.data().likes || 0), 0)
+            };
 
-const likesCounter = async () => {
-    const likesCached = myCache.get("likes");
-    if (likesCached) {
-        return likesCached;
-    }
-
-    const result = await Image.aggregate([
-        {
-            $group: {
-                _id: "1",
-                likesTotal: { $sum: "$likes" }
-            }
+            statsCache.set('stats', stats);
+            return stats;
+        } catch (error) {
+            console.error('Error getting stats:', error);
+            return {
+                images: 0,
+                comments: 0,
+                views: 0,
+                likes: 0
+            };
         }
-    ]);
+    },
 
-    if (result.length === 0) {
-        return 0;
+    async getPopular() {
+        const querySnapshot = await db.collection('images')
+            .orderBy('views', 'desc')
+            .limit(9)
+            .get();
+            
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+    },
+
+    async getSidebar(viewModel) {
+        const [stats, popular] = await Promise.all([
+            this.getStats(),
+            this.getPopular()
+        ]);
+
+        return {
+            ...viewModel,
+            sidebar: { 
+                stats,
+                popular 
+            }
+        };
     }
-
-    const likes = result[0].likesTotal;
-    myCache.set("likes", likes); // Guardar en caché
-    return likes;
 };
 
-const Estadisticas = async () => {
-    const imagesCached = myCache.get("images");
-    const commentsCached = myCache.get("comments");
-    const images = imagesCached || (await imageCounter());
-    const comments = commentsCached || (await commentsCounter());
-    const views = await viewsCounter();
-    const likes = await likesCounter();
-
-    if (!imagesCached) myCache.set("images", images); // Guardar en caché
-    if (!commentsCached) myCache.set("comments", comments); // Guardar en caché
-
-    return { images, comments, views, likes };
-};
-
-const updateCache = () => {
-    myCache.flushAll(); // Limpiar toda la caché
-};
-
-module.exports = {
-    Estadisticas,
-    updateCache
-};
+module.exports = stats;

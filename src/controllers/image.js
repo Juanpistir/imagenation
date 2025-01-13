@@ -1,179 +1,148 @@
-const path = require("path");
-const { randonNumber } = require("../helpers/libs");
-const md5 = require("md5"); //
-const { updateCache } = require("../helpers/stats");
-const { Image, Comment } = require("../models");
-const sidebar = require("../helpers/sidebar");
-const { SafeString } = require("handlebars");
+const { Images, Comments } = require("../models");
+const { db } = require("../config/firebase.config");
+const admin = require('firebase-admin');
+const md5 = require("md5");
+const stats = require("../helpers/stats");
+const {
+  imageSchema,
+  imageQuerySchema,
+  imageSearchSchema
+} = require('../schemas/image.schema');
+const { pipeline } = require('stream');
+const { promisify } = require('util');
 
-const ctrl = {};
+const finished = promisify(pipeline);
 
-ctrl.index = async (req, res) => {
-  let viewModel = { images: {}, comments: {} };
-
-  const image = await Image.findOne({
-    filename: { $regex: req.params.image_id },
-  });
-
-  if (image) {
-    // Convierte el contenido de la imagen a base64
-    const base64 = Buffer.from(image.image.data).toString('base64');
-
-    // Añade el tipo de contenido al inicio de la cadena base64
-    const imgSrc = new SafeString(`data:${image.image.contentType};base64,${base64}`);
-
-    const comments = await Comment.find({ image_id: image._id });
-    image.views = image.views + 1;
-    viewModel.comments = comments;
-    await image.save();
-    updateCache();
-    viewModel.imageSrc = imgSrc; // Cambia esto para usar imgSrc en lugar de image
-    viewModel.image = image; // Añade esto para mantener una referencia al objeto image original// Cambia esto para usar imgSrc en lugar de image
-    viewModel = await sidebar(viewModel);
-    res.render("image", viewModel);
-  } else {
-    res.redirect("/");
-  }
-};
-
-
-
-
-ctrl.create = async (req, res) => {
-  const saveImage = async () => {
-    const imgUrl = randonNumber(); // Genera el nombre de archivo aleatorio
-
-    const existingImages = await Image.find({ filename: imgUrl });
-    if (existingImages.length > 0) {
-      // Si el nombre del archivo ya existe, intenta generar uno nuevo
-      return saveImage();
-    } else {
-      const ext = path.extname(req.file.originalname).toLowerCase();
-      if (
-        ext !== ".png" &&
-        ext !== ".jpg" &&
-        ext !== ".jpeg" &&
-        ext !== ".gif"
-      ) {
-        const errorMessage = "Solo imágenes permitidas";
-        return res.send(
-          `<script>alert('${errorMessage}'); window.history.back();</script>`
-        );
+const imageController = {
+  async getImage(request, reply) {
+    try {
+      const { id } = await imageQuerySchema.parseAsync(request.params);
+      const image = await Images.findOne(id);
+      
+      if (!image) {
+        return reply.status(404).send({ error: 'Imagen no encontrada' });
       }
 
-      try {
-        const newImage = new Image({
-          title: req.body.title,
-          image: { data: req.file.buffer, contentType: req.file.mimetype }, // { data: Buffer, contentType: String
-          filename: imgUrl + ext,
-          description: req.body.description,
+      const comments = await Comments.find(id);
+
+      return reply.view("image", await stats.getSidebar({
+        image,
+        comments,
+        imageUrl: image.imageUrl
+      }));
+    } catch (error) {
+      request.log.error(error);
+      if (error.name === 'ZodError') {
+        reply.status(400).send({
+          error: 'ID de imagen inválido',
+          details: error.errors
         });
-        await newImage.save();
-        updateCache();
-        res.redirect("/images/" + imgUrl);
-      } catch (error) {
-        console.error("Error al subir la imagen:", error);
-        res.status(500).send("Error al subir la imagen");
+        return;
       }
+      throw new Error('Error al obtener la imagen');
     }
-  };
+  },
 
-  // Espera a que saveImage se complete antes de continuar
-  await saveImage();
-};
-  // Controlador de likes
-
-ctrl.like = async (req, res) => {
-  // lo siguiente sirve para que busque todas las imagenes que cumplen con id que se le esta pasando por la ruta
-
-  const image = await Image.findOne({
-    filename: { $regex: req.params.image_id },
-  });
-
-  //Si se encuente una imagen haz lo siguiente:
-
-  if (image) {
-    image.likes = image.likes + 1; // Aumenta la cantidad de likes en 1,
-    await image.save(); // Guardalo en la base de datos
-    updateCache();
-    res.json({ likes: image.likes }); // Responde la peticion mostrando la cantidad total de likes al cliente
-  } else {
-    res.status(500).json({ error: "Internal Error" }); //En caso de no poder encontrar una imagen mostrar un error.
-  }
-};
-
-// Controlador que usamos para crear nuevos comentarios
-
-ctrl.comment = async (req, res) => {
-  const image = await Image.findOne({
-    filename: { $regex: req.params.image_id },
-  });
-  if (image) {
-    const newComment = new Comment(req.body);
-    newComment.gravatar = md5(newComment.email);
-    newComment.image_id = image._id;
-    await newComment.save();
-    updateCache();
-    res.redirect("/images/" + image.uniqueId);
-  } else {
-    res.redirect("/");
-  }
-};
-
-// Controlador que usamos para eliminar las imagenes,
-
-ctrl.remove = async (req, res) => {
-  try {
-    const image = await Image.findOne({
-      filename: { $regex: req.params.image_id },
-    });
-
-    if (image) {
-      // Elimina los comentarios asociados a la imagen
-      await Comment.deleteMany({ image_id: image._id });
-
-      // Elimina la imagen de la base de datos
-      await Image.deleteOne({ _id: image._id });
-      updateCache();
-      res.json("La imagen fue eliminada exitosamente");
-    } else {
-      res.status(404).json({ error: "La imagen no fue encontrada" });
+  async createImage(request, reply) {
+    try {
+      const data = await request.file();
+      const chunks = [];
+      
+      for await (const chunk of data.file) {
+        chunks.push(chunk);
+      }
+      
+      const buffer = Buffer.concat(chunks);
+      const result = await Images.create({
+        filename: data.filename,
+        title: data.filename
+      }, buffer);
+      
+      reply.redirect('/');
+    } catch (error) {
+      request.log.error(error);
+      reply.status(500).send('Error procesando la imagen');
     }
-  } catch (error) {
-    console.error("Error al eliminar la imagen:", error);
-    res.status(500).json({ error: "Error al eliminar la imagen" });
+  },
+
+  async likeImage(request, reply) {
+    try {
+      const { image_id } = request.params;
+      const image = await Images.findOne(image_id);
+      
+      if (!image) {
+        reply.status(404).send({ error: 'Imagen no encontrada' });
+        return;
+      }
+
+      const updatedImage = await Images.updateLikes(image_id, image.likes + 1);
+      return reply.send({ likes: updatedImage.likes });
+    } catch (error) {
+      request.log.error(error);
+      throw new Error('Error al dar like a la imagen');
+    }
+  },
+
+  async commentImage(request, reply) {
+    try {
+      const { image_id } = request.params;
+      const image = await Images.findOne(image_id);
+      
+      if (!image) {
+        reply.status(404).send({ error: 'Imagen no encontrada' });
+        return;
+      }
+
+      await Comments.create({ 
+        ...request.body,
+        gravatar: md5(request.body.email),
+        image_id: image_id // Usar el ID de Firebase directamente
+      });
+      return reply.redirect(`/images/${image_id}`);
+    } catch (error) {
+      request.log.error(error);
+      throw new Error('Error al comentar en la imagen');
+    }
+  },
+
+  async deleteImage(request, reply) {
+    try {
+      const { image_id } = request.params;
+      const image = await Images.findOne(image_id);
+      
+      if (!image) {
+        reply.status(404).send({ error: 'Imagen no encontrada' });
+        return;
+      }
+
+      await Images.deleteImage(image.publicId);
+      return reply.send({ message: 'Imagen eliminada' });
+    } catch (error) {
+      request.log.error(error);
+      throw new Error('Error al eliminar la imagen');
+    }
+  },
+
+  async searchImages(request, reply) {
+    try {
+      const { query } = await imageSearchSchema.parseAsync(request.query);
+      
+      const snapshot = await db.collection('images')
+        .where('title', '>=', query)
+        .where('title', '<=', query + '\uf8ff')
+        .get();
+
+      const images = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+
+      return reply.send({ results: images });
+    } catch (error) {
+      request.log.error(error);
+      throw new Error('Error en la búsqueda de imágenes');
+    }
   }
 };
 
-ctrl.searchByTitle = async (req, res) => {
-  const searchTerm = req.query.title;
-
-  try {
-    const images = await Image.find({
-      title: { $regex: searchTerm, $options: "i" },
-    });
-
-    const results = images.map(image => {
-      // Convierte el contenido de la imagen a base64
-      const base64 = Buffer.from(image.image.data).toString('base64');
-
-      // Crea un nuevo objeto con las propiedades que necesitamos
-      return {
-        _id: image._id,
-        title: image.title,
-        description: image.description,
-        filename: image.filename,
-        views: image.views,
-        likes: image.likes,
-        timestamp: image.timestamp,
-        imgSrc: `data:${image.image.contentType};base64,${base64}`,
-      };
-    });
-
-    res.json({ results });
-  } catch (error) {
-    res.status(500).json({ error: "Error al buscar imágenes por título" });
-  }
-};
-
-module.exports = ctrl;
+module.exports = imageController;

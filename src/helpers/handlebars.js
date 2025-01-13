@@ -1,0 +1,32 @@
+const timehelpers = {
+    timeago(timestamp) {
+        if (!timestamp) return '';
+        
+        const seconds = Math.floor((new Date() - timestamp) / 1000);
+        
+        let interval = Math.floor(seconds / 31536000);
+        if (interval > 1) return `hace ${interval} años`;
+        if (interval === 1) return 'hace 1 año';
+        
+        interval = Math.floor(seconds / 2592000);
+        if (interval > 1) return `hace ${interval} meses`;
+        if (interval === 1) return 'hace 1 mes';
+        
+        interval = Math.floor(seconds / 86400);
+        if (interval > 1) return `hace ${interval} días`;
+        if (interval === 1) return 'hace 1 día';
+        
+        interval = Math.floor(seconds / 3600);
+        if (interval > 1) return `hace ${interval} horas`;
+        if (interval === 1) return 'hace 1 hora';
+        
+        interval = Math.floor(seconds / 60);
+        if (interval > 1) return `hace ${interval} minutos`;
+        if (interval === 1) return 'hace 1 minuto';
+        
+        if (seconds > 1) return `hace ${Math.floor(seconds)} segundos`;
+        return 'hace un momento';
+    }
+};
+
+module.exports = timehelpers;

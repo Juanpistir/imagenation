@@ -1,0 +1,67 @@
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-body">
+                <h2 class="text-center mb-4">Iniciar Sesión</h2>
+                <form id="loginForm" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                        <div class="invalid-feedback">
+                            Por favor ingresa un email válido
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Contraseña</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                        <div class="invalid-feedback">
+                            La contraseña es requerida
+                        </div>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
+                    </div>
+                    <div id="errorMessage" class="alert alert-danger mt-3 d-none"></div>
+                </form>
+                <div class="text-center mt-3">
+                    <p>¿No tienes cuenta? <a href="/register">Regístrate</a></p>
+                </div>
+                <div class="text-center mt-3">
+                    <p>O inicia sesión con:</p>
+                    <button onclick="loginWithGoogle()" class="btn btn-outline-danger">
+                        <i class="fab fa-google me-2"></i>Google
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const errorMessage = document.getElementById('errorMessage');
+
+    try {
+        await login(email, password);
+        // El token se manejará automáticamente a través de onAuthStateChanged
+    } catch (error) {
+        errorMessage.textContent = 'Error al iniciar sesión: ' + error.message;
+        errorMessage.classList.remove('d-none');
+    }
+});
+
+async function loginWithGoogle() {
+    try {
+        await loginWithGoogle();
+        // El token se manejará automáticamente a través de onAuthStateChanged
+    } catch (error) {
+        const errorMessage = document.getElementById('errorMessage');
+        errorMessage.textContent = 'Error al iniciar sesión con Google: ' + error.message;
+        errorMessage.classList.remove('d-none');
+    }
+}
+</script>

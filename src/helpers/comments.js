@@ -1,20 +1,22 @@
-const { Comment, Image } = require("../models");
-const { SafeString } = require("handlebars");
+const { db } = require('../config/firebase.config');
 
-module.exports = {
-  async newest() {
-    const comments = await Comment.find().limit(5).sort({ timestamp: -1 });
+const Comments = {
+    async newest() {
+        try {
+            const querySnapshot = await db.collection('comments')
+                .orderBy('timestamp', 'desc')
+                .limit(5)
+                .get();
 
-    for (const comment of comments) {
-      const image = await Image.findOne({ _id: comment.image_id });
-      // Convierte el contenido de la imagen a base64
-      const base64 = Buffer.from(image.image.data).toString('base64');
-
-      // Añade el tipo de contenido al inicio de la cadena base64
-      image.imgSrc = new SafeString(`data:${image.image.contentType};base64,${base64}`);
-      comment.image = image;
+            return querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+        } catch (error) {
+            console.error('Error getting comments:', error);
+            return [];
+        }
     }
-
-    return comments;
-  },
 };
+
+module.exports = Comments;

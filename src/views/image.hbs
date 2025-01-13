@@ -1,60 +1,43 @@
 <div class="card">
-  <div class="card-header acomodar">
+  <div class="card-header d-flex justify-content-between align-items-center">
     <h2>{{image.title}}</h2>
-
-      <!--El id btn-delete y su data-id permite que cuando clickeamos el botón nos elimine la imagen por medio de jquery y peticion "DELETE" con ajax -->
-
-    <button class="btn btn-danger" id="btn-delete" data-id="{{image.uniqueId}}">
-      <i class="fa fa-times"></i>
-      <!-- Hacemos uso de este span para remplazarlo por otro contenido en el texto -->
-      <span>Eliminar</span>
+    <button class="btn btn-danger" id="btn-delete" data-id="{{image.id}}">
+      <i class="fa fa-times"></i> Eliminar
     </button>
   </div>
   <div class="card-body">
-    <p>{{image.description}}</p>
-    <div class="text-center">
-      <img src="{{imageSrc}}" alt="" class="img-fluid" />
-    </div>
+    <img src="{{image.imageUrl}}" alt="{{image.title}}" class="img-fluid">
   </div>
-  <div class="card-footer acomodar">
-
-    <!-- Poner el id de los botones es importante para usarlos en jquery, ejemplo id="btn-like"
-      Tambien el data-id es importante para que usando este boton podamos obtener esa información en este
-      caso obtener el nombre de la imagen -->
-
-    <button class="btn btn-success" id="btn-like" data-id="{{image.filename}}">
-      <i class="fas fa-thumbs-up"></i>
-      Me gusta
-    </button>
-    <p>
-
-      <!-- Utilizaremos la clase "likes-count" para alterar lo que hay dentro del span -->
-
-      <span class="likes-count">{{image.likes}}</span>
-      <i class="fas fa-heart"></i>
-    </p>
-    <p>
-      <i class="fas fa-eye"></i>{{image.views}}
-    </p>
-    <p>
-      <i class="fas fa-clock"></i>{{back image.timestamp}}
-    </p>
+  <div class="card-footer">
+    <div class="row">
+      <button class="btn btn-success" id="btn-like" data-id="{{image.filename}}">
+        <i class="fas fa-thumbs-up"></i>
+        Me gusta
+      </button>
+      <p>
+        <span class="likes-count">{{image.likes}}</span>
+        <i class="fas fa-heart"></i>
+      </p>
+      <p>
+        <i class="fas fa-eye"></i>{{image.views}}
+      </p>
+      <p>
+        <i class="fas fa-clock"></i>{{timeago image.timestamp}}
+      </p>
+    </div>
   </div>
 </div>
 
 <div class="card mt-2">
   <div class="card-header acomodar">
     <h3>Comentarios</h3>
-
-      <!-- Hacemos uso del id btn-toggle-comment para permitir esconder o mostrar la opcion de comentar -->
-
     <button class="btn btn-info" id="btn-toggle-comment"><i
         class="fa fa comment-0"
       ></i>Haz un comentario</button>
   </div>
   <div class="card-body">
     <blockquote id="post-comment">
-      <form action="/images/{{image.uniqueId}}/comment" method="post">
+      <form action="/images/{{image.id}}/comment" method="post">
         <div class="form-group">
           <input
             type="text"
@@ -64,7 +47,6 @@
           />
         </div>
         <div class="form-group">
-
           <input
             type="text"
             class="form-control mb-2"
@@ -73,7 +55,6 @@
           />
         </div>
         <div class="form-group">
-
           <textarea
             type="text"
             class="form-control mb-2"
@@ -86,10 +67,8 @@
           <button class="btn btn-success" id="btn-comment">
             <i class="fa fa-comment"></i>Publicar</button>
         </div>
-
       </form>
     </blockquote>
-
     <ul class="list-group">
       {{#each comments}}
         <li class="list-group-item">
@@ -106,14 +85,12 @@
               <footer class="blockquote-footer row">
                 {{name}}
                 -
-                {{back timestamp}}
+                {{timeago timestamp}}
               </footer>
-
             </div>
           </div>
         </li>
       {{/each}}
     </ul>
-
   </div>
 </div>

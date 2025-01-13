@@ -1,14 +1,23 @@
-<div class="card mb-2">
-  <div class="card-header bg-azulSec">
-    <h5 class="card-title text-black">
-      <i class="fa-solid fa-chart-bar"></i>
-      Estadisticas
-    </h5>
-  </div>
-  <div class="card-body">
-    <p><i class="fas fa-images"></i> Imagenes: {{sidebar.stats.images}}</p>
-    <p><i class="fas fa-comments"></i> Comentarios: {{sidebar.stats.comments}}</p>
-    <p><i class="fas fa-eye"></i> Vistas: {{sidebar.stats.views}}</p>
-    <p><i class="fas fa-heart"></i> Likes: {{sidebar.stats.likes}}</p>
-  </div>
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="card-title mb-0">
+            <i class="fas fa-chart-bar me-2"></i>Estadísticas
+        </h5>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4">
+                <h6>Imágenes:</h6>
+                <p>{{images.length}}</p>
+            </div>
+            <div class="col-md-4">
+                <h6>Vistas:</h6>
+                <p>{{views}}</p>
+            </div>
+            <div class="col-md-4">
+                <h6>Comentarios:</h6>
+                <p>{{comments}}</p>
+            </div>
+        </div>
+    </div>
 </div>
