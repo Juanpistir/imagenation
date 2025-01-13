@@ -9,25 +9,55 @@
                 <li class="nav-item">
                     <a class="nav-link" href="/">Inicio</a>
                 </li>
-                {{#if user}}
-                    <li class="nav-item">
-                        <a class="nav-link" href="/images/upload">Subir Imagen</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/profile">Mi Perfil</a>
-                    </li>
-                    <li class="nav-item">
-                        <button class="nav-link btn btn-link" onclick="logout()">Cerrar Sesión</button>
-                    </li>
-                {{else}}
-                    <li class="nav-item">
-                        <a class="nav-link" href="/login">Iniciar Sesión</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/register">Registrarse</a>
-                    </li>
-                {{/if}}
+                <li class="nav-item" data-auth="logged-in">
+                    <a class="nav-link" href="/images/upload">
+                        <i class="fas fa-upload me-1"></i>
+                        Subir Imagen
+                    </a>
+                </li>
+                <li class="nav-item" data-auth="logged-in">
+                    <a class="nav-link" href="/profile">
+                        <i class="fas fa-user me-1"></i>
+                        <span data-user-info="email"></span>
+                    </a>
+                </li>
+                <li class="nav-item" data-auth="logged-in">
+                    <button class="nav-link btn btn-link" onclick="window.auth.logout()">
+                        <i class="fas fa-sign-out-alt me-1"></i>
+                        Cerrar Sesión
+                    </button>
+                </li>
+                <li class="nav-item" data-auth="logged-out">
+                    <a class="nav-link" href="/login">
+                        <i class="fas fa-sign-in-alt me-1"></i>
+                        Iniciar Sesión
+                    </a>
+                </li>
+                <li class="nav-item" data-auth="logged-out">
+                    <a class="nav-link" href="/register">
+                        <i class="fas fa-user-plus me-1"></i>
+                        Registrarse
+                    </a>
+                </li>
             </ul>
         </div>
     </div>
 </nav>
+
+<!-- Modal de Bienvenida -->
+<div class="modal fade" id="welcomeModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0">
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <h4 class="mb-3">¡Bienvenido/a!</h4>
+                <p>Has iniciado sesión como <strong><span data-user-info="email"></span></strong></p>
+            </div>
+            <div class="modal-footer border-0 justify-content-center">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Continuar</button>
+            </div>
+        </div>
+    </div>
+</div>

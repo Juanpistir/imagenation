@@ -1,175 +1,142 @@
-const { auth } = require('../config/firebase.config');
-const UserModel = require('../models/user');
-const fastifyPlugin = require('fastify-plugin');
+const { auth, db } = require('../config/firebase.config');
 
 async function routes(fastify, options) {
-  const ratelimitConfig = {
-    config: {
-      rateLimit: {
-        max: 5,
-        timeWindow: '15 minutes'
-      }
-    }
-  };
-
-  // Aplicar rate limit solo a rutas de autenticación
-  fastify.post('/auth/login', ratelimitConfig, async (request, reply) => {
+  // Middleware para verificar autenticación
+  fastify.addHook('preHandler', async (request, reply) => {
     try {
-      const { idToken } = request.body;
-
-      if (!idToken) {
-        return reply.code(400).send({ error: 'Token de autenticación requerido' });
+      const authHeader = request.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const idToken = authHeader.split('Bearer ')[1];
+        try {
+          const decodedToken = await auth.verifyIdToken(idToken);
+          request.user = decodedToken;
+          console.log('✅ Usuario autenticado:', decodedToken.email);
+        } catch (error) {
+          console.error('❌ Error verificando token:', error);
+        }
       }
-
-      // Verificar el ID Token con Firebase
-      const decodedToken = await auth.verifyIdToken(idToken);
-      const { uid, email, name } = decodedToken;
-
-      // Buscar o crear el usuario en Firestore
-      let user = await UserModel.findById(uid);
-      if (!user) {
-        user = await UserModel.create({
-          uid,
-          email,
-          username: name || 'Usuario'
-        });
-      }
-
-      // Generar un token personalizado para el servidor (opcional)
-      // const serverToken = fastify.jwt.sign({ uid: user.uid, roles: user.roles });
-
-      // Establecer el token en una cookie HTTP-only
-      reply.setCookie('token', idToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/'
-      });
-
-      return { message: 'Inicio de sesión exitoso' };
     } catch (error) {
-      console.error('Error en /auth/login:', error);
-      reply.code(401).send({ error: 'Autenticación fallida', details: error.message });
+      console.error('❌ Error en middleware de autenticación:', error);
     }
   });
 
-  fastify.post('/auth/register', ratelimitConfig, async (request, reply) => {
+  // Login de usuario
+  fastify.post('/api/auth/login', async (request, reply) => {
+    console.log('🔵 [LOGIN] Iniciando proceso de login');
     try {
-      const { email, password, username } = request.body;
+      const { email, password } = request.body;
+      console.log('📝 [LOGIN] Email recibido:', email);
 
-      // Verificar si el usuario ya existe
-      const existingUser = await UserModel.findByEmail(email);
-      if (existingUser) {
-        return reply.code(400).send({ 
-          error: 'Registro fallido',
-          details: 'El email ya está registrado' 
-        });
-      }
+      // Verificar credenciales con Firebase Auth
+      const userRecord = await auth.getUserByEmail(email);
+      console.log('✅ [LOGIN] Usuario encontrado:', userRecord.uid);
+
+      // Generar token personalizado
+      console.log('🔄 [LOGIN] Generando token...');
+      const token = await auth.createCustomToken(userRecord.uid);
+      console.log('✅ [LOGIN] Token generado');
+
+      // Obtener datos adicionales del usuario
+      const userDoc = await db.collection('users').doc(userRecord.uid).get();
+      const userData = userDoc.data() || {};
+
+      console.log('✅ [LOGIN] Login exitoso');
+      reply.send({
+        success: true,
+        user: {
+          uid: userRecord.uid,
+          email: userRecord.email,
+          displayName: userRecord.displayName,
+          ...userData
+        },
+        token
+      });
+    } catch (error) {
+      console.error('❌ [LOGIN] Error:', error);
+      reply.code(400).send({ error: error.message });
+    }
+  });
+
+  // Registro de usuario
+  fastify.post('/api/auth/register', async (request, reply) => {
+    console.log('🔵 [REGISTER] Iniciando registro');
+    try {
+      const { email, password, name } = request.body;
+      console.log('📝 [REGISTER] Datos recibidos:', { email, name });
 
       // Crear usuario en Firebase Auth
+      console.log('🔄 [REGISTER] Creando usuario...');
       const userRecord = await auth.createUser({
         email,
         password,
-        displayName: username
-      }).catch(error => {
-        console.error('Error Firebase Auth:', error);
-        throw error;
+        displayName: name
       });
+      console.log('✅ [REGISTER] Usuario creado:', userRecord.uid);
 
-      // Crear usuario en Firestore
-      const user = await UserModel.create({
-        uid: userRecord.uid,
+      // Crear perfil en Firestore
+      await db.collection('users').doc(userRecord.uid).set({
+        name,
         email,
-        username
+        createdAt: new Date(),
+        updatedAt: new Date()
       });
+      console.log('✅ [REGISTER] Perfil creado en Firestore');
 
-      // Obtener el token personalizado de Firebase
-      const idToken = await auth.createCustomToken(user.uid);
+      // Generar token
+      const token = await auth.createCustomToken(userRecord.uid);
+      console.log('✅ [REGISTER] Token generado');
 
-      // Establecer el token en una cookie HTTP-only
-      reply.setCookie('token', idToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/'
+      reply.send({
+        success: true,
+        user: userRecord,
+        token
       });
-
-      return { message: 'Registro exitoso' };
     } catch (error) {
-      console.error('Error en /auth/register:', error);
-      reply.code(400).send({ 
-        error: 'Registro fallido',
-        details: error.message 
-      });
+      console.error('❌ [REGISTER] Error:', error);
+      reply.code(400).send({ error: error.message });
     }
   });
 
-  fastify.post('/auth/logout', {
-    preHandler: [fastify.authenticate]
-  }, async (request, reply) => {
+  // Verificar sesión actual
+  fastify.get('/api/auth/verify', async (request, reply) => {
+    console.log('🔵 [VERIFY] Verificando sesión');
     try {
-      // Revocar tokens de refresh en Firebase
-      await auth.revokeRefreshTokens(request.userId);
+      if (!request.user) {
+        throw new Error('No autenticado');
+      }
 
-      // Eliminar la cookie del token
-      reply.clearCookie('token', { path: '/' });
+      const userRecord = await auth.getUser(request.user.uid);
+      const userDoc = await db.collection('users').doc(request.user.uid).get();
+      const userData = userDoc.data() || {};
 
-      return { message: 'Cierre de sesión exitoso' };
+      console.log('✅ [VERIFY] Sesión válida para:', userRecord.email);
+      reply.send({
+        success: true,
+        user: {
+          ...userRecord,
+          ...userData
+        }
+      });
     } catch (error) {
-      console.error('Error en /auth/logout:', error);
-      reply.code(500).send({ error: 'Error al cerrar sesión', details: error.message });
+      console.error('❌ [VERIFY] Error:', error);
+      reply.code(401).send({ error: error.message });
     }
   });
 
-  // Rutas sin rate limit
-  fastify.get('/auth/google', async (request, reply) => {
-    return reply.view('auth/google-redirect');
-  });
-
-  fastify.post('/auth/google', async (request, reply) => {
+  // Cerrar sesión
+  fastify.post('/api/auth/logout', async (request, reply) => {
+    console.log('🔵 [LOGOUT] Cerrando sesión');
     try {
-      const { idToken } = request.body;
-
-      if (!idToken) {
-        return reply.code(400).send({ error: 'Token de Google requerido' });
+      if (request.user) {
+        await auth.revokeRefreshTokens(request.user.uid);
+        console.log('✅ [LOGOUT] Tokens revocados para:', request.user.email);
       }
-
-      // Verificar el token de Google
-      const decodedToken = await auth.verifyIdToken(idToken);
-      const { email, name, picture, uid } = decodedToken;
-
-      // Buscar o crear usuario
-      let user = await UserModel.findById(uid);
-      if (!user) {
-        user = await UserModel.create({
-          uid,
-          email,
-          username: name || 'Usuario',
-          profilePicture: picture,
-          authProvider: 'google'
-        });
-      }
-
-      // Establecer el token en una cookie HTTP-only
-      reply.setCookie('token', idToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        path: '/'
-      });
-
-      return { message: 'Autenticación con Google exitosa' };
+      reply.send({ success: true });
     } catch (error) {
-      console.error('Error en /auth/google:', error);
-      reply.code(400).send({ 
-        error: 'Autenticación con Google fallida',
-        details: error.message 
-      });
+      console.error('❌ [LOGOUT] Error:', error);
+      reply.code(400).send({ error: error.message });
     }
   });
 }
 
-module.exports = fp(routes, {
-  name: 'authRoutes',
-  dependencies: ['@fastify/jwt']
-});
+module.exports = routes;

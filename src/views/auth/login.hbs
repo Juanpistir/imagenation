@@ -1,67 +1,90 @@
-<div class="row justify-content-center">
-    <div class="col-md-6 col-lg-4">
-        <div class="card shadow">
-            <div class="card-body">
-                <h2 class="text-center mb-4">Iniciar Sesión</h2>
-                <form id="loginForm" class="needs-validation" novalidate>
-                    <div class="mb-3">
-                        <label for="email" class="form-label">Email</label>
-                        <input type="email" class="form-control" id="email" name="email" required>
-                        <div class="invalid-feedback">
-                            Por favor ingresa un email válido
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="password" class="form-label">Contraseña</label>
-                        <input type="password" class="form-control" id="password" name="password" required>
-                        <div class="invalid-feedback">
-                            La contraseña es requerida
-                        </div>
-                    </div>
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">Iniciar Sesión</button>
-                    </div>
-                    <div id="errorMessage" class="alert alert-danger mt-3 d-none"></div>
-                </form>
-                <div class="text-center mt-3">
-                    <p>¿No tienes cuenta? <a href="/register">Regístrate</a></p>
-                </div>
-                <div class="text-center mt-3">
-                    <p>O inicia sesión con:</p>
-                    <button onclick="loginWithGoogle()" class="btn btn-outline-danger">
-                        <i class="fab fa-google me-2"></i>Google
-                    </button>
-                </div>
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h2 class="text-center mb-4">Iniciar Sesión</h2>
+          <form id="loginForm">
+            <div class="mb-3">
+              <label for="email" class="form-label">Email</label>
+              <input type="email" class="form-control" id="email" required>
             </div>
+            <div class="mb-3">
+              <label for="password" class="form-label">Contraseña</label>
+              <input type="password" class="form-control" id="password" required>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Iniciar Sesión</button>
+          </form>
+          <div class="text-center mt-3">
+            <p>¿No tienes cuenta? <a href="/register">Regístrate</a></p>
+          </div>
         </div>
+      </div>
     </div>
+  </div>
 </div>
 
 <script>
-document.getElementById('loginForm').addEventListener('submit', async (e) => {
+// Esperar a que Firebase esté listo
+function waitForFirebase() {
+  return new Promise((resolve) => {
+    const checkFirebase = setInterval(() => {
+      if (window.firebase && window.auth) {
+        clearInterval(checkFirebase);
+        resolve();
+      }
+    }, 100);
+  });
+}
+
+// Inicializar el formulario
+async function initializeLoginForm() {
+  await waitForFirebase();
+  
+  const loginForm = document.getElementById('loginForm');
+  const submitButton = loginForm.querySelector('button[type="submit"]');
+  let isLoggingIn = false;
+
+  loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    const errorMessage = document.getElementById('errorMessage');
+    // Evitar múltiples intentos de login
+    if (isLoggingIn) return;
+    isLoggingIn = true;
+
+    // Deshabilitar el botón y mostrar estado de carga
+    submitButton.disabled = true;
+    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Iniciando sesión...';
 
     try {
-        await login(email, password);
-        // El token se manejará automáticamente a través de onAuthStateChanged
-    } catch (error) {
-        errorMessage.textContent = 'Error al iniciar sesión: ' + error.message;
-        errorMessage.classList.remove('d-none');
-    }
-});
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
 
-async function loginWithGoogle() {
-    try {
-        await loginWithGoogle();
-        // El token se manejará automáticamente a través de onAuthStateChanged
+      // Intentar login
+      const success = await window.auth.login(email, password);
+      
+      if (!success) {
+        throw new Error('Error al iniciar sesión');
+      }
     } catch (error) {
-        const errorMessage = document.getElementById('errorMessage');
-        errorMessage.textContent = 'Error al iniciar sesión con Google: ' + error.message;
-        errorMessage.classList.remove('d-none');
+      console.error('Error en login:', error);
+      
+      // Mostrar mensaje de error
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error al iniciar sesión',
+        text: error.message || 'Ha ocurrido un error inesperado',
+        confirmButtonText: 'Entendido'
+      });
+      
+      // Restaurar el formulario
+      submitButton.disabled = false;
+      submitButton.innerHTML = 'Iniciar Sesión';
+      isLoggingIn = false;
     }
+  });
 }
+
+// Inicializar cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', initializeLoginForm);
 </script>

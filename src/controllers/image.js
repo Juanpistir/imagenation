@@ -45,23 +45,102 @@ const imageController = {
 
   async createImage(request, reply) {
     try {
-      const data = await request.file();
-      const chunks = [];
-      
-      for await (const chunk of data.file) {
-        chunks.push(chunk);
+      // Verificar si el usuario está autenticado
+      if (!request.user) {
+        return reply.status(401).send({ 
+          error: 'Debes iniciar sesión para subir imágenes' 
+        });
       }
+
+      request.log.info('Iniciando carga de imagen para usuario:', request.user.uid);
       
-      const buffer = Buffer.concat(chunks);
+      // Verificar que la solicitud sea multipart
+      if (!request.isMultipart()) {
+        request.log.error('La solicitud no es multipart');
+        return reply.status(400).send({ error: 'La solicitud debe ser multipart/form-data' });
+      }
+
+      const data = {};
+      let fileFound = false;
+      
+      try {
+        const parts = await request.parts();
+        
+        for await (const part of parts) {
+          request.log.info('Procesando parte:', {
+            fieldname: part.fieldname,
+            type: part.type,
+            mimetype: part.mimetype
+          });
+
+          if (part.type === 'file' && part.fieldname === 'image') {
+            fileFound = true;
+            try {
+              const chunks = [];
+              for await (const chunk of part.file) {
+                chunks.push(chunk);
+              }
+              data.imageBuffer = Buffer.concat(chunks);
+              data.filename = part.filename;
+              request.log.info(`Archivo procesado: ${part.filename}, tamaño: ${data.imageBuffer.length} bytes`);
+            } catch (fileError) {
+              request.log.error('Error procesando el archivo:', fileError);
+              throw new Error('Error al procesar el archivo subido');
+            }
+          } else {
+            try {
+              const value = await part.value;
+              data[part.fieldname] = value;
+              request.log.info(`Campo procesado: ${part.fieldname} = ${value}`);
+            } catch (fieldError) {
+              request.log.error(`Error procesando campo ${part.fieldname}:`, fieldError);
+            }
+          }
+        }
+
+        if (!fileFound) {
+          throw new Error('No se encontró el campo de archivo en el formulario');
+        }
+
+      } catch (parseError) {
+        request.log.error('Error al parsear las partes:', parseError);
+        return reply.status(400).send({ 
+          error: 'Error al procesar el formulario',
+          details: parseError.message 
+        });
+      }
+
+      // Validar que todos los campos requeridos estén presentes
+      if (!data.imageBuffer) {
+        request.log.error('No se encontró la imagen en la solicitud');
+        return reply.status(400).send({ error: 'No se proporcionó ninguna imagen' });
+      }
+
+      if (!data.title || !data.description) {
+        request.log.error('Faltan campos requeridos:', { 
+          title: !!data.title, 
+          description: !!data.description 
+        });
+        return reply.status(400).send({ error: 'El título y la descripción son requeridos' });
+      }
+
+      // Crear la imagen con el userId del usuario autenticado
       const result = await Images.create({
         filename: data.filename,
-        title: data.filename
-      }, buffer);
-      
-      reply.redirect('/');
+        title: data.title,
+        description: data.description,
+        userId: request.user.uid,
+        timestamp: new Date()
+      }, data.imageBuffer);
+
+      request.log.info('Imagen creada exitosamente');
+      return reply.redirect('/');
     } catch (error) {
-      request.log.error(error);
-      reply.status(500).send('Error procesando la imagen');
+      request.log.error('Error al procesar la imagen:', error);
+      return reply.status(500).send({ 
+        error: 'Error procesando la imagen',
+        details: error.message 
+      });
     }
   },
 
