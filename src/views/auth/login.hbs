@@ -1,90 +1,89 @@
-<div class="container mt-5">
-  <div class="row justify-content-center">
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-body">
-          <h2 class="text-center mb-4">Iniciar Sesión</h2>
-          <form id="loginForm">
-            <div class="mb-3">
-              <label for="email" class="form-label">Email</label>
-              <input type="email" class="form-control" id="email" required>
-            </div>
-            <div class="mb-3">
-              <label for="password" class="form-label">Contraseña</label>
-              <input type="password" class="form-control" id="password" required>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">Iniciar Sesión</button>
-          </form>
-          <div class="text-center mt-3">
-            <p>¿No tienes cuenta? <a href="/register">Regístrate</a></p>
-          </div>
-        </div>
+<div x-data="{ 
+    email: '', 
+    password: '',
+    errors: {
+        email: '',
+        password: '',
+        general: ''
+    }
+}">
+  <h1>Iniciar Sesión</h1>
+
+  <!-- Mensaje de error general -->
+  <div x-show="errors.general" class="error-alert mb-4" x-text="errors.general"></div>
+
+  <form @submit.prevent="
+    errors = {email: '', password: '', general: ''};
+    
+    // Validaciones locales
+    if (password.length < 6) {
+      errors.password = 'La contraseña debe tener al menos 6 caracteres';
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      errors.email = 'Por favor ingresa un email válido';
+      return;
+    }
+    
+    // Si pasa validaciones, llamar al store
+    $store.auth.login(email, password)
+      .then(() => {
+        // El login fue exitoso, la redirección se maneja en el store
+      })
+      .catch(error => {
+        errors.general = error.message;
+      });
+  ">
+    <fieldset :disabled="$store.auth.isLoading" class="space-y-4">
+      <div class="form-group">
+        <label for="login-email">Correo electrónico</label>
+        <input 
+          type="email" 
+          x-model="email" 
+          id="login-email" 
+          @input="errors.email = ''"
+          :class="{ 'border-red-500': errors.email }"
+          placeholder="tucorreo@ejemplo.com" 
+          required
+          class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+        <div x-show="errors.email" class="text-red-500 text-sm mt-1" x-text="errors.email"></div>
       </div>
-    </div>
-  </div>
+
+      <div class="form-group">
+        <label for="login-password">Contraseña</label>
+        <input 
+          type="password" 
+          x-model="password" 
+          id="login-password" 
+          @input="errors.password = ''"
+          :class="{ 'border-red-500': errors.password }"
+          placeholder="Tu contraseña" 
+          required
+          class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+        <div x-show="errors.password" class="text-red-500 text-sm mt-1" x-text="errors.password"></div>
+      </div>
+
+      <button 
+        type="submit" 
+        class="w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        :class="{ 'opacity-50 cursor-not-allowed': $store.auth.isLoading }"
+      >
+        <span x-show="!$store.auth.isLoading">
+          Iniciar Sesión
+        </span>
+        <span x-show="$store.auth.isLoading" class="flex items-center justify-center">
+          <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Iniciando sesión...
+        </span>
+      </button>
+    </fieldset>
+  </form>
 </div>
 
-<script>
-// Esperar a que Firebase esté listo
-function waitForFirebase() {
-  return new Promise((resolve) => {
-    const checkFirebase = setInterval(() => {
-      if (window.firebase && window.auth) {
-        clearInterval(checkFirebase);
-        resolve();
-      }
-    }, 100);
-  });
-}
-
-// Inicializar el formulario
-async function initializeLoginForm() {
-  await waitForFirebase();
-  
-  const loginForm = document.getElementById('loginForm');
-  const submitButton = loginForm.querySelector('button[type="submit"]');
-  let isLoggingIn = false;
-
-  loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    // Evitar múltiples intentos de login
-    if (isLoggingIn) return;
-    isLoggingIn = true;
-
-    // Deshabilitar el botón y mostrar estado de carga
-    submitButton.disabled = true;
-    submitButton.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Iniciando sesión...';
-
-    try {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-
-      // Intentar login
-      const success = await window.auth.login(email, password);
-      
-      if (!success) {
-        throw new Error('Error al iniciar sesión');
-      }
-    } catch (error) {
-      console.error('Error en login:', error);
-      
-      // Mostrar mensaje de error
-      await Swal.fire({
-        icon: 'error',
-        title: 'Error al iniciar sesión',
-        text: error.message || 'Ha ocurrido un error inesperado',
-        confirmButtonText: 'Entendido'
-      });
-      
-      // Restaurar el formulario
-      submitButton.disabled = false;
-      submitButton.innerHTML = 'Iniciar Sesión';
-      isLoggingIn = false;
-    }
-  });
-}
-
-// Inicializar cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', initializeLoginForm);
-</script>
+<script type="module" src="/public/js/firebaseClient.js"></script>
+<script type="module" src="/public/js/authAlpine.js"></script>

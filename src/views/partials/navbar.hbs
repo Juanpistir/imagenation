@@ -1,63 +1,191 @@
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-    <div class="container">
-        <a class="navbar-brand" href="/">Imagenation</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ms-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="/">Inicio</a>
-                </li>
-                <li class="nav-item" data-auth="logged-in">
-                    <a class="nav-link" href="/images/upload">
-                        <i class="fas fa-upload me-1"></i>
-                        Subir Imagen
-                    </a>
-                </li>
-                <li class="nav-item" data-auth="logged-in">
-                    <a class="nav-link" href="/profile">
-                        <i class="fas fa-user me-1"></i>
-                        <span data-user-info="email"></span>
-                    </a>
-                </li>
-                <li class="nav-item" data-auth="logged-in">
-                    <button class="nav-link btn btn-link" onclick="window.auth.logout()">
-                        <i class="fas fa-sign-out-alt me-1"></i>
-                        Cerrar Sesión
-                    </button>
-                </li>
-                <li class="nav-item" data-auth="logged-out">
-                    <a class="nav-link" href="/login">
-                        <i class="fas fa-sign-in-alt me-1"></i>
-                        Iniciar Sesión
-                    </a>
-                </li>
-                <li class="nav-item" data-auth="logged-out">
-                    <a class="nav-link" href="/register">
-                        <i class="fas fa-user-plus me-1"></i>
-                        Registrarse
-                    </a>
-                </li>
-            </ul>
-        </div>
-    </div>
-</nav>
+{{! Script para testear que se pasen datos del usuario }}
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    try {
+      const user = {{#if user}}{{{json user}}}{{else}}null{{/if}};
+      const userData = user ? {
+        user,
+        isAuthenticated: {{#if user.isAuthenticated}}true{{else}}false{{/if}},
+        email: user.email || "",
+        photoURL: user.photoURL || "",
+        displayName: user.displayName || "",
+        username: user.username || "",
+        bio: user.bio || ""
+      } : null;
+      
+      if (userData) {
+        console.log('Datos del usuario en navbar:', userData);
+      } else {
+        console.warn('Usuario no autenticado o datos inválidos');
+      }
+    } catch (error) {
+      console.error('Error al procesar datos de usuario:', error);
+    }
+  });
+</script>
 
-<!-- Modal de Bienvenida -->
-<div class="modal fade" id="welcomeModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header border-0">
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+{{! Navbar Component }}
+<div>
+  <nav class='bg-white/95 shadow-sm sticky top-0 z-50'>
+    <div class='max-w-7xl mx-auto px-4 sm:px-6 lg:px-8'>
+      <div class='flex justify-between items-center h-16'>
+        <div class='flex items-center flex-1'>
+          <a href='/' class='flex items-center text-primary hover:opacity-80 transition-opacity'>
+            <i class='fas fa-images text-xl mr-2'></i>
+            <span class='font-bold text-xl hidden md:block'>Imagenation</span>
+          </a>
+
+          <!-- Search Bar -->
+          <div
+            class="relative mx-auto max-w-3xl w-full px-8"
+            x-data="$store.search"
+            @click.away="isSearching = false"
+          >
+            <div class="relative group">
+              <input
+                type="search"
+                x-model="searchQuery"
+                @input="executeSearch"
+                @focus="isSearching = true"
+                placeholder="Buscar imágenes..."
+                class="w-full bg-gray-100 border border-gray-200 rounded-lg pl-10 pr-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-200"
+                :class="{ 'ring-2 ring-primary': isSearching }"
+                aria-label="Buscar imágenes"
+                autocomplete="off"
+              />
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <i 
+                  class="fas fa-search text-gray-400 transition-all duration-200" 
+                  :class="{ 'animate-spin': isSpinning }"
+                  aria-hidden="true"
+                ></i>
+              </div>
             </div>
-            <div class="modal-body text-center py-4">
-                <h4 class="mb-3">¡Bienvenido/a!</h4>
-                <p>Has iniciado sesión como <strong><span data-user-info="email"></span></strong></p>
+
+            <!-- Resultados de búsqueda -->
+            <div
+              x-show="isSearching && searchResults.length > 0"
+              x-transition:enter="transition ease-out duration-200"
+              x-transition:enter-start="opacity-0 translate-y-1"
+              x-transition:enter-end="opacity-100 translate-y-0"
+              x-transition:leave="transition ease-in duration-150"
+              x-transition:leave-start="opacity-100 translate-y-0"
+              x-transition:leave-end="opacity-0 translate-y-1"
+              class="absolute left-8 right-8 mt-2 bg-white rounded-lg shadow-lg overflow-hidden z-50 border border-gray-200"
+              x-cloak
+            >
+              <div class="max-h-96 overflow-y-auto">
+                <template x-for="result in searchResults" :key="result.id">
+                  <a
+                    :href="'/images/' + result.id"
+                    class="block p-4 hover:bg-gray-50 transition-colors duration-150 flex items-center space-x-4"
+                  >
+                    <img
+                      :src="result.thumbnail"
+                      :alt="result.title"
+                      class="w-16 h-16 object-cover rounded-lg"
+                      loading="lazy"
+                    />
+                    <div class="flex-1 min-w-0">
+                      <h4 
+                        class="text-sm font-medium text-gray-900 truncate" 
+                        x-text="result.title"
+                      ></h4>
+                      <p 
+                        class="text-sm text-gray-500 truncate" 
+                        x-text="result.description || 'Sin descripción'"
+                      ></p>
+                      <p class="text-xs text-gray-400 mt-1">
+                        <span x-text="new Date(result.timestamp).toLocaleDateString()"></span>
+                      </p>
+                    </div>
+                  </a>
+                </template>
+              </div>
             </div>
-            <div class="modal-footer border-0 justify-content-center">
-                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Continuar</button>
+
+            <!-- Mensaje cuando no hay resultados -->
+            <div
+              x-show="isSearching && searchQuery.length >= minChars && !isSpinning && searchResults.length === 0"
+              x-transition
+              class="absolute left-8 right-8 mt-2 p-4 bg-white rounded-lg shadow-lg text-center text-gray-500"
+              x-cloak
+            >
+              No se encontraron resultados para "<span x-text="searchQuery"></span>"
             </div>
+          </div>
         </div>
+
+        <div class='flex items-center navbar-user-section'>
+          {{#if user}}
+            {{#if user.isAuthenticated}}
+              <div class='relative ml-3' x-data='{ open: false }'>
+                <div class="flex items-center">
+                  <button type='button' @click='open = !open' class='flex items-center'>
+                    {{#if user.photoURL}}
+                      <img
+                        class='h-8 w-8 rounded-full object-cover'
+                        src='{{user.photoURL}}'
+                        alt='{{user.displayName}}'
+                      />
+                    {{else}}
+                      <div class='h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center'>
+                        <i class='fas fa-user text-gray-500'></i>
+                      </div>
+                    {{/if}}
+                    <div class="ml-3 hidden sm:flex flex-col text-left">
+                      {{#if user.displayName}}
+                        <span class="text-sm font-medium text-gray-700">{{user.displayName}}</span>
+                        <span class="text-xs text-gray-500 truncate">{{user.email}}</span>
+                      {{else}}
+                        <span class="text-sm font-medium text-gray-700">{{user.email}}</span>
+                      {{/if}}
+                    </div>
+                  </button>
+                </div>
+
+                <div
+                  x-show='open'
+                  @click.away='open = false'
+                  class='absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5'
+                >
+                  <a
+                    href='/profile/{{user.uid}}'
+                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100'
+                  >
+                    <i class='fas fa-user-circle mr-2'></i>Perfil
+                  </a>
+                  <a
+                    href='#'
+                    @click.prevent="$store.auth.logout()"
+                    class='block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100'
+                  >
+                    <i class='fas fa-sign-out-alt mr-2'></i>Cerrar Sesión
+                  </a>
+                </div>
+              </div>
+            {{else}}
+              <div class='flex space-x-4'>
+                <a href='/auth/login' class='text-gray-700 hover:text-gray-900'>
+                  <i class='fas fa-sign-in-alt mr-1'></i>Iniciar Sesión
+                </a>
+                <a href='/auth/register' class='text-gray-700 hover:text-gray-900'>
+                  <i class='fas fa-user-plus mr-1'></i>Registrarse
+                </a>
+              </div>
+            {{/if}}
+          {{else}}
+            <div class='flex space-x-4'>
+              <a href='/auth/login' class='text-gray-700 hover:text-gray-900'>
+                <i class='fas fa-sign-in-alt mr-1'></i>Iniciar Sesión
+              </a>
+              <a href='/auth/register' class='text-gray-700 hover:text-gray-900'>
+                <i class='fas fa-user-plus mr-1'></i>Registrarse
+              </a>
+            </div>
+          {{/if}}
+        </div>
+      </div>
     </div>
+  </nav>
 </div>

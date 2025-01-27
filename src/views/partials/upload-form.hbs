@@ -1,0 +1,133 @@
+<!-- views/upload-form.hbs -->
+<div x-data="{
+        title: '',
+        description: '',
+        file: null,
+        preview: null,
+        isLoading: false,
+        error: null,
+        
+        async submitForm() {
+            this.isLoading = true;
+            this.error = null;
+            
+            try {
+                const formData = new FormData();
+                formData.append('title', this.title);
+                formData.append('description', this.description);
+                formData.append('image', this.file);
+                
+                const response = await fetch('/images/upload', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Error desconocido');
+                }
+                
+                const result = await response.json();
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Éxito!',
+                    text: 'Imagen subida correctamente',
+                    showConfirmButton: false,
+                    timer: 2000
+                });
+                
+                // Resetear formulario
+                this.title = '';
+                this.description = '';
+                this.file = null;
+                this.preview = null;
+                
+            } catch (error) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: error.message || 'Error al subir la imagen',
+                    confirmButtonText: 'Entendido'
+                });
+                this.error = error.message;
+            } finally {
+                this.isLoading = false;
+            }
+        },
+        
+        handleFileChange(event) {
+            const file = event.target.files[0];
+            if (file) {
+                this.file = file;
+                const reader = new FileReader();
+                reader.onload = (e) => this.preview = e.target.result;
+                reader.readAsDataURL(file);
+            }
+        }
+    }" 
+    class="max-w-2xl mx-auto p-6"
+>
+    <form @submit.prevent="submitForm" class="space-y-6">
+        <!-- Título -->
+        <div>
+            <label class="block text-gray-700 mb-2">Título:</label>
+            <input 
+                type="text" 
+                x-model="title" 
+                required
+                class="w-full p-2 border rounded"
+                :disabled="isLoading"
+            >
+        </div>
+
+        <!-- Descripción -->
+        <div>
+            <label class="block text-gray-700 mb-2">Descripción:</label>
+            <textarea 
+                x-model="description" 
+                required
+                class="w-full p-2 border rounded h-32"
+                :disabled="isLoading"
+            ></textarea>
+        </div>
+
+        <!-- Selector de archivo -->
+        <div>
+            <label class="block text-gray-700 mb-2">Imagen:</label>
+            <div class="flex items-center space-x-4">
+                <input 
+                    type="file" 
+                    @change="handleFileChange" 
+                    accept="image/*"
+                    required
+                    class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    :disabled="isLoading"
+                >
+                
+                <!-- Vista previa -->
+                <template x-if="preview">
+                    <img 
+                        :src="preview" 
+                        class="w-20 h-20 object-cover rounded border"
+                        alt="Vista previa"
+                    >
+                </template>
+            </div>
+        </div>
+
+        <!-- Botón de enviar -->
+        <button 
+            type="submit" 
+            class="w-full bg-blue-500 text-white p-3 rounded hover:bg-blue-600 transition-colors"
+            :disabled="isLoading || !title || !description || !file"
+            :class="{ 'opacity-50 cursor-not-allowed': isLoading }"
+        >
+            <span x-show="!isLoading">Subir imagen</span>
+            <span x-show="isLoading">Subiendo...</span>
+        </button>
+    </form>
+</div>

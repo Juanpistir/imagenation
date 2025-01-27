@@ -1,0 +1,151 @@
+{{!-- Vista de Perfil --}}
+<div class="min-h-screen bg-gray-50" 
+     x-data 
+     x-init="$store.profile.init()">
+    {{!-- Banner y Perfil Header --}}
+    <div class="relative">
+        {{!-- Banner --}}
+        <div class="h-80 w-full overflow-hidden">
+            <template x-if="$store.profile.profile.bannerUrl">
+                <img :src="$store.profile.profile.bannerUrl" 
+                     :alt="'Banner de ' + $store.profile.profile.displayName"
+                     class="w-full h-full object-cover">
+            </template>
+            <template x-if="!$store.profile.profile.bannerUrl">
+                <div class="w-full h-full bg-gradient-to-r from-blue-500 to-purple-600"></div>
+            </template>
+        </div>
+
+        {{!-- Información del Perfil --}}
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="relative -mt-32">
+                <div class="bg-white rounded-xl shadow-lg p-6">
+                    <div class="sm:flex sm:items-center sm:justify-between">
+                        {{!-- Avatar y Nombre --}}
+                        <div class="sm:flex sm:space-x-5">
+                            <div class="flex-shrink-0">
+                                <img class="mx-auto h-32 w-32 rounded-full border-4 border-white shadow-lg"
+                                     :src="$store.profile.profile.photoURL" 
+                                     :alt="$store.profile.profile.displayName">
+                            </div>
+                            <div class="mt-4 sm:mt-0 sm:pt-1 sm:text-left">
+                                <p class="text-sm text-gray-600" x-text="'@' + $store.profile.profile.username"></p>
+                                <h1 class="text-2xl font-bold text-gray-900 sm:text-3xl" x-text="$store.profile.profile.displayName"></h1>
+                                <p class="text-gray-600 mt-2" x-text="$store.profile.profile.bio"></p>
+                            </div>
+                        </div>
+
+                        {{!-- Botones de Acción --}}
+                        <div class="mt-5 flex justify-center sm:mt-0">
+                            {{#if (eq user.uid profile.id)}}
+                                <button @click="$store.profile.startEditing()" 
+                                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                    <i class="fas fa-edit mr-2"></i>
+                                    Editar Perfil
+                                </button>
+                            {{/if}}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {{!-- Galería de Imágenes --}}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <template x-for="image in $store.profile.profile.images" :key="image.id">
+                <a :href="'/images/' + image.id" class="block">
+                    <div class="aspect-w-1 aspect-h-1 w-full overflow-hidden rounded-lg bg-gray-200">
+                        <img :src="image.url" 
+                             :alt="image.title"
+                             class="h-full w-full object-cover transform transition-all duration-300 hover:scale-105">
+                    </div>
+                </a>
+            </template>
+        </div>
+    </div>
+
+    {{!-- Modal de Edición --}}
+    <div x-show="$store.profile.isEditing" 
+         class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full"
+         x-transition>
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Editar Perfil</h3>
+                
+                <form @submit.prevent="$store.profile.saveProfile()" class="mt-4">
+                    {{!-- Mensaje de Error --}}
+                    <div x-show="$store.profile.error" 
+                         x-text="$store.profile.error"
+                         class="mb-4 text-sm text-red-600">
+                    </div>
+
+                    {{!-- Nombre --}}
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700">Nombre</label>
+                        <input type="text" 
+                               x-model="$store.profile.formData.displayName"
+                               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                               required>
+                    </div>
+
+                    {{!-- Bio --}}
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700">Bio</label>
+                        <textarea x-model="$store.profile.formData.bio"
+                                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"
+                                  rows="3"></textarea>
+                    </div>
+
+                    {{!-- Foto de Perfil --}}
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700">Foto de Perfil</label>
+                        <input type="file" 
+                               @change="$store.profile.handlePhotoChange($event)"
+                               accept="image/*"
+                               class="mt-1 block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-dark">
+                    </div>
+
+                    {{!-- Botones --}}
+                    <div class="flex justify-end space-x-3">
+                        <button type="button"
+                                @click="$store.profile.cancelEditing()"
+                                class="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                            Cancelar
+                        </button>
+                        <button type="submit"
+                                :disabled="$store.profile.isLoading"
+                                class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                            <span x-show="!$store.profile.isLoading">Guardar</span>
+                            <span x-show="$store.profile.isLoading">
+                                <i class="fas fa-spinner fa-spin"></i>
+                            </span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Inicializar datos del perfil de forma segura
+    const defaultProfile = {
+        id: '',
+        uid: '',
+        email: '',
+        username: '',
+        displayName: '',
+        bio: '',
+        photoURL: '',
+        createdAt: null,
+        updatedAt: null,
+        role: 'user',
+        isActive: true,
+        images: []
+    };
+    
+    window.PROFILE_DATA = {{{json profile}}} || defaultProfile;
+    console.log('PROFILE_DATA inicializado:', window.PROFILE_DATA);
+</script>

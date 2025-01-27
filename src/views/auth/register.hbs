@@ -1,40 +1,119 @@
-<div class="container mt-5">
-  <div class="row justify-content-center">
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-body">
-          <h2 class="text-center mb-4">Registro</h2>
-          <form id="registerForm">
-            <div class="mb-3">
-              <label for="email" class="form-label">Email</label>
-              <input type="email" class="form-control" id="email" required>
-            </div>
-            <div class="mb-3">
-              <label for="password" class="form-label">Contraseña</label>
-              <input type="password" class="form-control" id="password" required>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">Registrarse</button>
-          </form>
-          <div class="text-center mt-3">
-            <p>¿Ya tienes cuenta? <a href="/login">Iniciar Sesión</a></p>
-          </div>
-        </div>
+<div x-data="{ 
+    email: '', 
+    password: '', 
+    confirmPassword: '',
+    errors: {
+        email: '',
+        password: '',
+        confirmPassword: '',
+        general: ''
+    }
+}">
+  <h1>Crear Cuenta</h1>
+
+  <!-- Mensaje de error general -->
+  <div x-show="errors.general" class="error-alert mb-4" x-text="errors.general"></div>
+
+  <form @submit.prevent="
+    errors = {email: '', password: '', confirmPassword: '', general: ''};
+    
+    // Validaciones locales
+    if (password !== confirmPassword) {
+      errors.confirmPassword = 'Las contraseñas no coinciden';
+      return;
+    }
+    if (password.length < 6) {
+      errors.password = 'La contraseña debe tener al menos 6 caracteres';
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      errors.email = 'Por favor ingresa un email válido';
+      return;
+    }
+    
+    // Si pasa validaciones, llamar al store
+    $store.auth.register(email, password)
+      .then(() => {
+        // El registro fue exitoso, la redirección se maneja en el store
+      })
+      .catch(error => {
+        errors.general = error.message;
+      });
+  ">
+    <fieldset :disabled="$store.auth.isLoading" class="space-y-4">
+      <div class="form-group">
+        <label for="reg-email">Correo electrónico</label>
+        <input 
+          type="email" 
+          x-model="email" 
+          id="reg-email" 
+          @input="errors.email = ''"
+          :class="{ 'border-red-500': errors.email }"
+          placeholder="tucorreo@ejemplo.com" 
+          required
+          class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+        <div x-show="errors.email" class="text-red-500 text-sm mt-1" x-text="errors.email"></div>
       </div>
-    </div>
+
+      <div class="form-group">
+        <label for="reg-password">Contraseña</label>
+        <input 
+          type="password" 
+          x-model="password" 
+          id="reg-password" 
+          @input="errors.password = ''"
+          :class="{ 'border-red-500': errors.password }"
+          placeholder="Mínimo 6 caracteres" 
+          required
+          class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+        <div x-show="errors.password" class="text-red-500 text-sm mt-1" x-text="errors.password"></div>
+      </div>
+
+      <div class="form-group">
+        <label for="reg-confirm-password">Confirmar Contraseña</label>
+        <input 
+          type="password" 
+          x-model="confirmPassword" 
+          id="reg-confirm-password" 
+          @input="errors.confirmPassword = ''"
+          :class="{ 'border-red-500': errors.confirmPassword }"
+          placeholder="Repite tu contraseña" 
+          required
+          class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+        >
+        <div x-show="errors.confirmPassword" class="text-red-500 text-sm mt-1" x-text="errors.confirmPassword"></div>
+      </div>
+
+      <button 
+        type="submit" 
+        class="w-full py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        :class="{ 'opacity-50 cursor-not-allowed': $store.auth.isLoading }"
+      >
+        <span x-show="!$store.auth.isLoading">
+          Crear Cuenta
+        </span>
+        <span x-show="$store.auth.isLoading" class="flex items-center justify-center">
+          <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Registrando...
+        </span>
+      </button>
+    </fieldset>
+  </form>
+
+  <div class="auth-links mt-4 text-center">
+    <p>¿Ya tienes cuenta? <a href="/auth/login" class="text-blue-600 hover:text-blue-700">Inicia Sesión</a></p>
   </div>
 </div>
 
 <script>
-document.getElementById('registerForm').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-
-  try {
-    await window.auth.register(email, password);
-    window.location.href = '/';
-  } catch (error) {
-    alert(error.message);
-  }
-});
+  // Inicializar USER_JSON antes de cargar authAlpine.js
+  const USER_JSON = null;
 </script>
+
+<script type="module" src="/public/js/firebaseClient.js"></script>
+<script type="module" src="/public/js/authAlpine.js"></script>

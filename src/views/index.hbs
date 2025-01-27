@@ -1,39 +1,85 @@
-<div class="row">
-    <div class="col-md-4">
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white">
-                <h3 class="h5 mb-0"><i class="fas fa-upload me-2"></i>Subir imagen</h3>
-            </div>
-            <div class="card-body">
-                <form action="/images" method="POST" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <input type="text" name="title" class="form-control" placeholder="Título de la imagen" required>
-                    </div>
-                    <div class="mb-3">
-                        <textarea name="description" rows="2" class="form-control" placeholder="Descripción de la imagen" required></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <input type="file" name="image" class="form-control" accept="image/*" required>
-                    </div>
-                    <button class="btn btn-primary w-100">
-                        <i class="fas fa-cloud-upload-alt me-2"></i>Subir
-                    </button>
-                </form>
-            </div>
-        </div>
-        {{> stats}}
+{{! Página principal }}
+<div class="min-h-screen bg-gray-50">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {{! Mensaje de bienvenida }}
+    <div class="text-center mb-12">
+      <h1 class="text-4xl font-bold text-gray-900 mb-4">Bienvenido a Imagenation</h1>
+      <p class="text-xl text-gray-600">Tu plataforma para compartir y descubrir imágenes increíbles</p>
     </div>
-    
-    <div class="col-md-8">
-        <h2 class="mb-4"><i class="far fa-images me-2"></i>Galería reciente</h2>
-        <div class="card-columns">
+
+    {{#if error}}
+      <div class="bg-red-100 border-l-4 border-red-500 p-4 mb-8 rounded-r-lg">
+        <p class="text-red-700">{{error}}</p>
+      </div>
+    {{/if}}
+
+    <div class="flex flex-col lg:flex-row gap-8">
+      {{! Sección principal con imágenes }}
+      <div class="lg:w-2/3 order-2 lg:order-1">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {{#if images.length}}
             {{#each images}}
-                {{> image-card this}}
-            {{else}}
-                <div class="alert alert-info"></div>
-                    <i class="fas fa-info-circle me-2"></i>No hay imágenes aún
-                </div>
+              <div class="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 overflow-hidden">
+                <a href="/images/{{this.id}}" class="block">
+                  <div class="aspect-w-16 aspect-h-9">
+                    <img 
+                      src="{{this.imageUrl}}" 
+                      alt="{{this.title}}" 
+                      class="w-full h-64 object-cover"
+                      loading="lazy"
+                    >
+                  </div>
+                  <div class="p-4">
+                    <h2 class="text-lg font-semibold text-gray-900 mb-2">{{truncate this.title 50}}</h2>
+                    <p class="text-gray-600 text-sm mb-4">{{truncate this.description 100}}</p>
+                    <div class="flex items-center justify-between text-sm">
+                      <div class="flex items-center space-x-4 text-gray-500">
+                        <span title="Vistas" class="flex items-center">
+                          <i class="fas fa-eye mr-1"></i>
+                          {{this.views}}
+                        </span>
+                        <span title="Me gusta" class="flex items-center">
+                          <i class="fas fa-heart mr-1"></i>
+                          {{this.likes}}
+                        </span>
+                        <span title="Comentarios" class="flex items-center">
+                          <i class="fas fa-comment mr-1"></i>
+                          {{this.commentCount}}
+                        </span>
+                      </div>
+                      <span class="text-xs text-gray-400" title="{{formatDate this.timestamp}}">
+                        {{timeago this.timestamp}}
+                      </span>
+                    </div>
+                  </div>
+                </a>
+              </div>
             {{/each}}
+          {{else}}
+            <div class="col-span-2">
+              <div class="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-r-lg">
+                <p class="text-blue-700 text-lg">No hay imágenes aún. ¡Sé el primero en subir una!</p>
+              </div>
+            </div>
+          {{/if}}
         </div>
+      </div>
+
+      {{! Barra lateral }}
+      <div class="lg:w-1/3 order-1 lg:order-2">
+        {{#if user}}
+          {{> upload-form}}
+        {{else}}
+          {{> login-prompt}}
+        {{/if}}
+
+        <div class="bg-white rounded-lg shadow-md p-4">
+          <h2 class="text-lg font-bold text-gray-800 mb-2">Estadísticas</h2>
+          <p class="text-gray-600">Total de imágenes: {{images.length}}</p>
+          <p class="text-gray-600">Total de likes: {{totalLikes}}</p>
+          <p class="text-gray-600">Total de vistas: {{totalViews}}</p>
+        </div>
+      </div>
     </div>
+  </div>
 </div>

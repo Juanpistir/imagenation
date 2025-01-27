@@ -1,96 +1,272 @@
-<div class="card">
-  <div class="card-header d-flex justify-content-between align-items-center">
-    <h2>{{image.title}}</h2>
-    <button class="btn btn-danger" id="btn-delete" data-id="{{image.id}}">
-      <i class="fa fa-times"></i> Eliminar
-    </button>
-  </div>
-  <div class="card-body">
-    <img src="{{image.imageUrl}}" alt="{{image.title}}" class="img-fluid">
-  </div>
-  <div class="card-footer">
-    <div class="row">
-      <button class="btn btn-success" id="btn-like" data-id="{{image.filename}}">
-        <i class="fas fa-thumbs-up"></i>
-        Me gusta
-      </button>
-      <p>
-        <span class="likes-count">{{image.likes}}</span>
-        <i class="fas fa-heart"></i>
-      </p>
-      <p>
-        <i class="fas fa-eye"></i>{{image.views}}
-      </p>
-      <p>
-        <i class="fas fa-clock"></i>{{timeago image.timestamp}}
-      </p>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12" 
+     x-data="imageActions('{{image.id}}', '{{image.url}}')"
+     x-init="init()">
+    
+    <!-- Imagen principal -->
+    <div class="relative p-8">
+        <img src="{{image.mainImageUrl}}" 
+             alt="{{image.title}}" 
+             class="w-full max-h-[70vh] object-contain">
+        
+        <!-- Botones de acción -->
+        <template x-if="$store.auth.isAuthenticated">
+            <template x-if="$store.auth.user && $store.auth.user.uid === '{{image.userId}}'">
+                <div class="flex space-x-2">
+                    <button @click="$store.auth.editImage('{{image.id}}', '{{image.title}}', `{{image.description}}`)" 
+                            class="inline-flex items-center px-3 py-2 border border-primary text-sm font-medium rounded-md text-primary hover:bg-primary hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                            :disabled="$store.auth.isLoading">
+                        <i class="fas fa-edit mr-2"></i>
+                        <span x-text="$store.auth.isLoading ? 'Guardando...' : 'Editar'"></span>
+                    </button>
+                    <button @click="$store.auth.deleteImage('{{image.id}}')"
+                            class="inline-flex items-center px-3 py-2 border border-red-500 text-sm font-medium rounded-md text-red-500 hover:bg-red-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                            :disabled="$store.auth.isLoading">
+                        <i class="fas fa-trash-alt mr-2"></i>
+                        <span x-text="$store.auth.isLoading ? 'Eliminando...' : 'Eliminar'"></span>
+                    </button>
+                </div>
+            </template>
+        </template>
     </div>
-  </div>
-</div>
 
-<div class="card mt-2">
-  <div class="card-header acomodar">
-    <h3>Comentarios</h3>
-    <button class="btn btn-info" id="btn-toggle-comment"><i
-        class="fa fa comment-0"
-      ></i>Haz un comentario</button>
-  </div>
-  <div class="card-body">
-    <blockquote id="post-comment">
-      <form action="/images/{{image.id}}/comment" method="post">
-        <div class="form-group">
-          <input
-            type="text"
-            class="form-control mb-2"
-            name="name"
-            placeholder="Tu nombre"
-          />
+    <!-- Información de la imagen -->
+    <div class="p-8">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold text-gray-900">{{image.title}}</h3>
         </div>
-        <div class="form-group">
-          <input
-            type="text"
-            class="form-control mb-2"
-            name="email"
-            placeholder="Tu correo"
-          />
+
+        <div class="flex items-center text-gray-600 text-sm mb-4">
+            <i class="fas fa-user-circle mr-2"></i>
+            <span>{{image.userEmail}}</span>
+            <span class="mx-2">•</span>
+            <i class="far fa-clock mr-2"></i>
+            <span>{{timeago image.timestamp}}</span>
         </div>
-        <div class="form-group">
-          <textarea
-            type="text"
-            class="form-control mb-2"
-            rows="2"
-            placeholder="Tu comentario"
-            name="comment"
-          ></textarea>
-        </div>
-        <div class="form-group">
-          <button class="btn btn-success" id="btn-comment">
-            <i class="fa fa-comment"></i>Publicar</button>
-        </div>
-      </form>
-    </blockquote>
-    <ul class="list-group">
-      {{#each comments}}
-        <li class="list-group-item">
-          <div class="row">
-            <a href="#" class="col text-center">
-              <img
-                src="http://gravatar.com/avatar/{{gravatar}}?d=identicon&s=75"
-                alt=""
-                class="img-fluid"
-              />
-            </a>
-            <div class="col-10">
-              <p class="lead">{{comment}}</p>
-              <footer class="blockquote-footer row">
-                {{name}}
-                -
-                {{timeago timestamp}}
-              </footer>
+
+        {{#if image.description}}
+            <p class="text-gray-700 mb-6">{{image.description}}</p>
+        {{/if}}
+
+        <!-- Acciones -->
+        <div class="flex justify-between items-center py-4 border-t border-gray-100">
+            <div class="flex items-center space-x-4">
+                <template x-if="$store.auth.isAuthenticated">
+                    <button @click="toggleCollectionModal" 
+                            class="inline-flex items-center text-gray-600 hover:text-primary">
+                        <i class="far fa-bookmark mr-2"></i>
+                        Guardar
+                    </button>
+                </template>
             </div>
-          </div>
-        </li>
-      {{/each}}
-    </ul>
-  </div>
+        </div>
+
+        <!-- Estadísticas -->
+        <div class="flex justify-between items-center py-4 border-t border-gray-100">
+            <div class="flex items-center space-x-6">
+                <button 
+                    @click="$store.auth.toggleLike('{{image.id}}')"
+                    class="flex items-center text-gray-600 hover:text-red-500 transition like-button"
+                    :class="{ 'text-red-500': {{#if (includes image.likes user.uid)}}true{{else}}false{{/if}} }"
+                    data-image="{{image.id}}"
+                    :disabled="$store.auth.isLoading"
+                >
+                    <i class="fas fa-heart mr-2"></i>
+                    <span class="likes-count">{{image.likes}}</span> Me gusta
+                </button>
+                <button @click="focusComment" 
+                        class="flex items-center text-gray-600">
+                    <i class="fas fa-comment mr-2"></i>
+                    <span>{{image.comments.length}} Comentarios</span>
+                </button>
+                <div class="flex items-center text-gray-600">
+                    <i class="fas fa-eye mr-2"></i>
+                    <span>{{image.views}} Vistas</span>
+                </div>
+                <button @click="openCollectionModal" 
+                        class="flex items-center text-gray-600">
+                    <i class="fas fa-folder-plus mr-2"></i>
+                    <span>Guardar</span>
+                </button>
+                <button @click="shareImage" 
+                        class="text-gray-600 hover:text-primary transition">
+                    <i class="fas fa-share-alt"></i>
+                </button>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                {{#if user}}
+                <button onclick="openCollectionModal()" 
+                        class="flex items-center text-gray-600 hover:text-primary transition">
+                    <i class="fas fa-folder-plus text-xl"></i>
+                </button>
+                {{/if}}
+                <button class="text-gray-600 hover:text-primary transition" onclick="shareImage('{{image.url}}')">
+                    <i class="fas fa-share-alt text-xl"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Sección de Comentarios -->
+        <div class="mt-8 border-t border-gray-200 pt-8">
+            <h3 class="text-lg font-semibold text-gray-900 mb-6">Comentarios</h3>
+
+            <!-- Formulario de Comentario -->
+            <template x-if="$store.auth.isAuthenticated">
+                <form id="commentForm" class="mb-8" @submit.prevent="$store.auth.submitComment('{{image.id}}', $event.target.comment.value)">
+                    <div class="flex space-x-4">
+                        <div class="flex-shrink-0">
+                            <div class="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                                <i class="fas fa-user text-primary"></i>
+                            </div>
+                        </div>
+                        <div class="flex-grow">
+                            <textarea 
+                                name="comment" 
+                                rows="3" 
+                                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm resize-none"
+                                placeholder="Escribe un comentario..."
+                                required
+                            ></textarea>
+                            <div class="mt-3 flex justify-end">
+                                <button 
+                                    type="submit"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                                    :disabled="$store.auth.isLoading"
+                                >
+                                    <span x-text="$store.auth.isLoading ? 'Enviando...' : 'Comentar'"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </template>
+
+            <template x-if="!$store.auth.isAuthenticated">
+                <div class="bg-gray-50 rounded-lg p-4 text-center mb-8">
+                    <p class="text-gray-600">
+                        <a href="/auth/login" class="text-primary hover:text-primary-dark">Inicia sesión</a>
+                        para dejar un comentario
+                    </p>
+                </div>
+            </template>
+
+            <!-- Lista de Comentarios -->
+            <div id="commentsList" class="space-y-6">
+                {{#each image.comments}}
+                <div class="bg-white p-4 rounded-lg shadow mb-4 hover:shadow-lg transition-shadow duration-200" 
+                     data-comment="{{this.id}}">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-grow">
+                            <div class="flex items-center gap-2 mb-2">
+                                <div class="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <i class="fas fa-user text-primary"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium text-gray-900">{{this.userEmail}}</p>
+                                    <p class="text-xs text-gray-500">{{timeago this.timestamp}}</p>
+                                </div>
+                            </div>
+                            <p class="text-gray-600 mt-1">{{this.text}}</p>
+                        </div>
+                        {{#if (or (eq this.userId ../user.uid) (eq ../image.userId ../user.uid))}}
+                        <button @click="$store.auth.deleteComment('{{../image.id}}', '{{this.id}}')" 
+                                class="text-red-500 hover:text-red-600">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                        {{/if}}
+                    </div>
+                </div>
+                {{/each}}
+            </div>
+        </div>
+
+        {{#if user}}
+        <!-- Modal de Colecciones -->
+        <div id="collectionModal" class="modal hidden fixed inset-0 z-50" 
+             :class="{ 'hidden': !showCollectionModal }">
+            <!-- Overlay -->
+            <div class="absolute inset-0 bg-gray-600 bg-opacity-50 transition-opacity"></div>
+            
+            <!-- Modal -->
+            <div class="relative bg-white rounded-lg mx-auto mt-20 max-w-lg w-full p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h4 class="text-lg font-semibold text-gray-900">Guardar en colección</h4>
+                    <button @click="closeCollectionModal" 
+                            class="text-gray-400 hover:text-gray-500">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="space-y-2">
+                    {{#if collections.length}}
+                        {{#each collections}}
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <span class="text-gray-700">{{this.name}}</span>
+                                <button @click="addToCollection('{{this.id}}')"
+                                        class="text-primary hover:text-primary-dark">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
+                        {{/each}}
+                    {{else}}
+                        <p class="text-gray-500 text-center py-4">No tienes colecciones aún</p>
+                    {{/if}}
+                    
+                    <button @click="openNewCollectionModal"
+                            class="w-full flex items-center justify-center px-4 py-2 border border-primary text-sm font-medium rounded-md text-primary hover:bg-primary hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                        <i class="fas fa-plus mr-2"></i>
+                        Nueva colección
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal de Nueva Colección -->
+        <div id="newCollectionModal" class="modal hidden fixed inset-0 z-50">
+            <!-- Overlay -->
+            <div class="absolute inset-0 bg-gray-600 bg-opacity-50 transition-opacity"></div>
+            
+            <!-- Modal -->
+            <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-lg bg-white">
+                <div class="absolute top-0 right-0 pt-4 pr-4">
+                    <button type="button" onclick="closeNewCollectionModal()" class="text-gray-400 hover:text-gray-500">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="mt-3">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Crear Nueva Colección</h3>
+                    <form onsubmit="createCollection(event)">
+                        <div class="space-y-4">
+                            <div>
+                                <label for="name" class="block text-sm font-medium text-gray-700">Nombre</label>
+                                <input type="text" name="name" id="name" required
+                                       class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm">
+                            </div>
+                            <div>
+                                <label for="description" class="block text-sm font-medium text-gray-700">Descripción</label>
+                                <textarea name="description" id="description" rows="3"
+                                          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm"></textarea>
+                            </div>
+                            <div class="flex items-center">
+                                <input type="checkbox" name="isPublic" id="isPublic" checked
+                                       class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
+                                <label for="isPublic" class="ml-2 block text-sm text-gray-700">Colección pública</label>
+                            </div>
+                            <div class="flex justify-end space-x-3 pt-4">
+                                <button type="button" onclick="closeNewCollectionModal()"
+                                        class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                    Cancelar
+                                </button>
+                                <button type="submit"
+                                        class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                    Crear
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {{/if}}
+    </div>
 </div>
