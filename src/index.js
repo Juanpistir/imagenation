@@ -127,10 +127,10 @@ async function build(opts = {}) {
     });
 
     // Registrar rutas después de todos los plugins
+    await app.register(import('./routes/auth.js'));
+    await app.register(import('./routes/profile.js'));
     await app.register(import('./routes/images.js'));
     await app.register(import('./routes/index.js'));
-    await app.register(import('./routes/profile.js'));
-    await app.register(import('./routes/auth.js'));
 
     // Manejador de errores global
     app.setErrorHandler((error, request, reply) => {

@@ -54,6 +54,7 @@ export async function index(request, reply) {
         views: data.views || 0,
         commentCount: commentsSnapshot.size || 0,
         userId: data.userId,
+        uid: data.userId,
       });
     }
 

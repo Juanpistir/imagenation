@@ -9,8 +9,8 @@
              class="w-full max-h-[70vh] object-contain">
         
         <!-- Botones de acción -->
-        <template x-if="$store.auth.isAuthenticated">
-            <template x-if="$store.auth.user && $store.auth.user.uid === '{{image.userId}}'">
+        {{#if user}}
+            {{#if image.isOwner}}
                 <div class="flex space-x-2">
                     <button @click="$store.auth.editImage('{{image.id}}', '{{image.title}}', `{{image.description}}`)" 
                             class="inline-flex items-center px-3 py-2 border border-primary text-sm font-medium rounded-md text-primary hover:bg-primary hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
@@ -25,8 +25,8 @@
                         <span x-text="$store.auth.isLoading ? 'Eliminando...' : 'Eliminar'"></span>
                     </button>
                 </div>
-            </template>
-        </template>
+            {{/if}}
+        {{/if}}
     </div>
 
     <!-- Información de la imagen -->
@@ -36,7 +36,21 @@
         </div>
 
         <div class="flex items-center text-gray-600 text-sm mb-4">
-            <i class="fas fa-user-circle mr-2"></i>
+            {{#if image.userPhotoURL}}
+                <img class="h-10 w-10 rounded-full object-cover mr-2"
+                     src="{{image.userPhotoURL}}"
+                     alt="{{image.userDisplayName}}">
+            {{else}}
+                {{#if image.userDisplayName}}
+                    <div class="h-10 w-10 rounded-full bg-primary text-white flex items-center justify-center font-medium uppercase mr-2">
+                        {{firstChar image.userDisplayName}}
+                    </div>
+                {{else}}
+                    <div class="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center mr-2">
+                        <i class="fas fa-user text-gray-500"></i>
+                    </div>
+                {{/if}}
+            {{/if}}
             <span>{{image.userEmail}}</span>
             <span class="mx-2">•</span>
             <i class="far fa-clock mr-2"></i>
@@ -168,8 +182,8 @@
                             </div>
                             <p class="text-gray-600 mt-1">{{this.text}}</p>
                         </div>
-                        {{#if (or (eq this.userId ../user.uid) (eq ../image.userId ../user.uid))}}
-                        <button @click="$store.auth.deleteComment('{{../image.id}}', '{{this.id}}')" 
+                        {{#if (or (eq this.userId user.uid) (eq image.userId user.uid))}}
+                        <button @click="$store.auth.deleteComment('{{image.id}}', '{{this.id}}')" 
                                 class="text-red-500 hover:text-red-600">
                             <i class="fas fa-trash-alt"></i>
                         </button>

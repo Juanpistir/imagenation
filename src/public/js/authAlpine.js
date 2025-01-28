@@ -53,19 +53,26 @@ document.addEventListener('alpine:init', () => {
         // Actualizar la UI con los datos normalizados del usuario
         this.userData = user
           ? {
-              uid: user.uid,
+              userId: user.uid,
               email: user.email || '',
               username: user.email?.split('@')[0] || '',
               displayName: user.displayName || user.email?.split('@')[0] || '',
-              photoURL: user.photoURL || '',
+              photoURL: user.photoURL || 'https://www.gravatar.com/avatar/0?d=mp',
               bio: user.bio || '',
               createdAt: user.metadata?.creationTime || null,
               updatedAt: user.metadata?.lastSignInTime || null,
               role: user.role || 'user',
               isActive: true,
-              isAuthenticated: true,
+              isAuthenticated: true
             }
           : null;
+
+        // Debug de autenticación
+        console.log('Estado de autenticación actualizado:', {
+          currentUser: this.currentUser?.userId,
+          userData: this.userData,
+          isAuthenticated: this.isAuthenticated
+        });
 
         if (user) {
           await this.refreshToken();
@@ -204,42 +211,50 @@ document.addEventListener('alpine:init', () => {
 
     async deleteImage(imageId) {
       try {
+        if (!this.isAuthenticated || !imageId) {
+          console.error('No autorizado o ID de imagen inválido');
+          return;
+        }
+
+        const confirmed = await Swal.fire({
+          title: '¿Estás seguro?',
+          text: 'Esta acción no se puede deshacer',
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonColor: '#d33',
+          cancelButtonColor: '#3085d6',
+          confirmButtonText: 'Sí, eliminar',
+          cancelButtonText: 'Cancelar'
+        });
+
+        if (!confirmed.isConfirmed) return;
+
         this.isLoading = true;
 
-        const response = await fetch(`/images/${imageId}`, {
+        const response = await fetch(`/api/images/${imageId}`, {
           method: 'DELETE',
           headers: {
-            Authorization: `Bearer ${this.token}`,
-          },
+            'Authorization': `Bearer ${this.token}`
+          }
         });
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Error eliminando imagen');
+          throw new Error('Error al eliminar la imagen');
         }
 
-        const data = await response.json();
-
-        window.Toast.fire({
+        Toast.fire({
           icon: 'success',
-          title: 'Imagen eliminada correctamente',
+          title: 'Imagen eliminada correctamente'
         });
 
-        // Usar la URL de redirección proporcionada por el servidor
-        setTimeout(() => (window.location.href = data.redirectUrl || '/'), 1500);
+        // Redirigir al home después de eliminar
+        window.location.href = '/';
       } catch (error) {
-        window.Toast.fire({
+        console.error('Error al eliminar imagen:', error);
+        Toast.fire({
           icon: 'error',
-          title: error.message || 'Error al eliminar la imagen',
+          title: 'Error al eliminar la imagen'
         });
-
-        // Solo redirigir si es un error de autenticación
-        if (
-          error.message.includes('No autorizado') ||
-          error.message.includes('No tienes permiso')
-        ) {
-          this.handleAuthError(error);
-        }
       } finally {
         this.isLoading = false;
       }
@@ -477,9 +492,9 @@ document.addEventListener('alpine:init', () => {
     },
 
     createCommentHTML(comment) {
-      const isOwner = this.user?.uid === comment.userId;
+      const isOwner = this.user?.userId === comment.userId;
       const isImageOwner =
-        document.querySelector('[data-image-owner]')?.dataset.imageOwner === this.user?.uid;
+        document.querySelector('[data-image-owner]')?.dataset.imageOwner === this.user?.userId;
       const showDeleteButton = isOwner || isImageOwner;
 
       return `

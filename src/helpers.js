@@ -85,7 +85,11 @@ export const helpers = {
     return new Intl.NumberFormat().format(number);
   },
   includes: (array, value) => {
-    if (!array) return false;
-    return Array.isArray(array) && array.includes(value);
+    if (!Array.isArray(array)) return false;
+    return array.includes(value);
+  },
+  firstChar: (text) => {
+    if (!text) return '';
+    return text.charAt(0);
   },
 };

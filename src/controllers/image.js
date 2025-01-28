@@ -14,6 +14,8 @@ export const getImage = async (request, reply) => {
       return reply.code(400).send({ error: 'ID de imagen es requerido' });
     }
 
+    logger.info('Obteniendo imagen...', { imageId: id });
+
     // Obtener la imagen de Firestore
     const imageDoc = await adminDb.collection('images').doc(id).get();
 
@@ -24,9 +26,22 @@ export const getImage = async (request, reply) => {
 
     const imageData = imageDoc.data();
 
+    // Manejar la transición de uid a userId
+    const userId = imageData.userId || imageData.uid;
+    if (!userId) {
+      logger.error('Imagen sin ID de usuario válido:', { imageId: id, imageData });
+      return reply.code(500).send({ error: 'Datos de imagen inválidos' });
+    }
+
     // Obtener el usuario que subió la imagen
-    const userDoc = await adminDb.collection('users').doc(imageData.userId).get();
+    const userDoc = await adminDb.collection('users').doc(userId).get();
     const userData = userDoc.exists ? userDoc.data() : null;
+
+    logger.info('Datos recuperados:', {
+      imageId: id,
+      userId,
+      hasUserData: !!userData,
+    });
 
     // Obtener comentarios de la imagen
     const commentsSnapshot = await adminDb
@@ -58,23 +73,35 @@ export const getImage = async (request, reply) => {
         lastViewedAt: new Date(),
       });
 
-    // Normalizar datos del usuario actual
+    // Normalizar datos del usuario actual y del usuario de la imagen
     const currentUserData = normalizeUserData(request.user);
+    const imageUserData = normalizeUserData(userData);
 
     // Construir objeto de respuesta
     const image = {
       id,
       ...imageData,
-      userEmail: userData?.email || 'Usuario desconocido',
+      userId, // Usar el userId normalizado
+      userEmail: imageUserData?.email || 'Usuario desconocido',
+      userDisplayName: imageUserData?.displayName || 'Usuario desconocido',
+      userPhotoURL: imageUserData?.photoURL || '',
       comments,
       likes: Array.isArray(imageData.likes) ? imageData.likes.length : 0,
-      hasLiked: Array.isArray(imageData.likes) && imageData.likes.includes(request.user?.uid),
-      isAuthenticated: !!request.user,
+      hasLiked: Array.isArray(imageData.likes) && imageData.likes.includes(currentUserData?.uid),
+      isAuthenticated: !!currentUserData,
+      isOwner: currentUserData?.uid === userId, // Usar el userId normalizado
       user: currentUserData,
     };
 
-    // Renderizar la vista con los datos usando renderWithContext
-    return reply.renderWithContext('image', {
+    logger.info('Datos de imagen preparados:', {
+      imageId: id,
+      userId,
+      currentUserId: currentUserData?.uid,
+      isOwner: image.isOwner,
+    });
+
+    // Renderizar la vista con los datos
+    return reply.view('image', {
       image,
       user: currentUserData,
       error: null,
@@ -93,7 +120,7 @@ export const uploadImage = async (request, reply) => {
   const fields = {};
 
   try {
-    // 1. Procesar todas las partes del formulario en un solo ciclo
+    // 1. Procesar todas las partes del formulario
     for await (const part of request.parts()) {
       if (part.type === 'file') {
         file = part;
@@ -110,7 +137,6 @@ export const uploadImage = async (request, reply) => {
         file.buffer = Buffer.concat(chunks);
       } else if (part.type === 'field') {
         fields[part.fieldname] = part.value;
-        // Log solo los campos no sensibles
         if (!['password', 'token', 'apiKey'].includes(part.fieldname)) {
           logger.info(`Campo recibido: ${part.fieldname}`);
         }
@@ -118,6 +144,11 @@ export const uploadImage = async (request, reply) => {
     }
 
     // 2. Validaciones
+    if (!request.user?.uid) {
+      logger.error('Usuario no autenticado');
+      return reply.code(401).send({ error: 'Usuario no autenticado' });
+    }
+
     if (!fields.title?.trim()) {
       logger.error('No se proporcionó un título');
       return reply.code(400).send({ error: 'El título es requerido' });
@@ -128,7 +159,7 @@ export const uploadImage = async (request, reply) => {
       return reply.code(400).send({ error: 'La imagen es requerida' });
     }
 
-    // 3. Subir imagen a Cloudinary usando el buffer
+    // 3. Subir imagen a Cloudinary
     logger.info('Iniciando subida a Cloudinary...');
     const cloudinaryResult = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
@@ -188,32 +219,29 @@ export const uploadImage = async (request, reply) => {
     logger.info('Guardando metadatos en Firestore...', {
       title: imageData.title,
       userId: imageData.userId,
-      format: imageData.metadata.format,
+      imageUrl: imageData.imageUrl,
     });
 
+    // Validar que tenemos un ID de usuario válido
+    if (!imageData.userId) {
+      logger.error('ID de usuario no válido al subir imagen');
+      throw new Error('ID de usuario no válido');
+    }
+
+    // Crear un nuevo documento en la colección de imágenes
     const docRef = await adminDb.collection('images').add(imageData);
+    const newImageId = docRef.id;
 
-    logger.info('Imagen procesada exitosamente', {
-      imageId: docRef.id,
-      title: imageData.title,
+    logger.info('Imagen guardada exitosamente', {
+      imageId: newImageId,
+      userId: imageData.userId,
     });
 
-    // 5. Respuesta exitosa
-    reply.send({
-      success: true,
-      id: docRef.id,
-      imageUrl: imageData.mainImageUrl,
-      title: imageData.title,
-      description: imageData.description,
-    });
+    // Redirigir a la página de la imagen
+    return reply.redirect(`/images/${newImageId}`);
   } catch (error) {
-    logger.error('Error en el proceso de subida:', {
-      message: error.message,
-      code: error.code || 'UNKNOWN',
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
-    });
-
-    reply.code(500).send({
+    logger.error('Error subiendo imagen:', error);
+    return reply.code(500).send({
       error: 'Error al subir la imagen',
       details: error.message,
     });
@@ -435,51 +463,58 @@ export const toggleLike = async (request, reply) => {
     const userId = request.user?.uid;
 
     if (!id || !userId) {
-      logger.error('Datos incompletos para like:', { id, userId });
-      return reply.code(400).send({ error: 'Datos incompletos' });
+      logger.error('ID de imagen o usuario no proporcionado');
+      return reply.code(400).send({ error: 'ID de imagen y usuario son requeridos' });
     }
 
     const imageRef = adminDb.collection('images').doc(id);
+    const likeRef = adminDb.collection('likes').doc(`${userId}_${id}`);
 
-    // Usar transacción para evitar condiciones de carrera
-    const result = await adminDb.runTransaction(async (transaction) => {
-      const imageDoc = await transaction.get(imageRef);
+    const [imageDoc, likeDoc] = await Promise.all([
+      imageRef.get(),
+      likeRef.get()
+    ]);
 
-      if (!imageDoc.exists) {
-        throw new Error('Imagen no encontrada');
-      }
-
-      const imageData = imageDoc.data();
-      // Asegurar que likes sea un array válido
-      const likes = Array.isArray(imageData.likes) ? imageData.likes : [];
-
-      // Validar que todos los likes sean strings
-      const validLikes = likes.filter((id) => typeof id === 'string');
-      const hasLiked = validLikes.includes(userId);
-
-      const newLikes = hasLiked
-        ? validLikes.filter((id) => id !== userId)
-        : [...validLikes, userId];
-
-      transaction.update(imageRef, {
-        likes: newLikes,
-        lastModified: new Date(),
-      });
-
-      return {
-        success: true,
-        newLikesCount: newLikes.length,
-        hasLiked: !hasLiked,
-      };
-    });
-
-    reply.send(result);
-  } catch (error) {
-    logger.error('Error al dar like:', error);
-    if (error.message === 'Imagen no encontrada') {
-      return reply.code(404).send({ error: error.message });
+    if (!imageDoc.exists) {
+      return reply.code(404).send({ error: 'Imagen no encontrada' });
     }
-    reply.code(500).send({ error: 'Error del servidor' });
+
+    const batch = adminDb.batch();
+    const imageData = imageDoc.data();
+    const currentLikes = imageData.likes || [];
+    let liked = false;
+
+    if (likeDoc.exists) {
+      // Remove like
+      batch.delete(likeRef);
+      batch.update(imageRef, {
+        likes: currentLikes.filter(uid => uid !== userId),
+        likesCount: (imageData.likesCount || currentLikes.length) - 1
+      });
+    } else {
+      // Add like
+      batch.set(likeRef, {
+        userId,
+        imageId: id,
+        createdAt: new Date()
+      });
+      batch.update(imageRef, {
+        likes: [...currentLikes, userId],
+        likesCount: (imageData.likesCount || currentLikes.length) + 1
+      });
+      liked = true;
+    }
+
+    await batch.commit();
+
+    return reply.send({
+      success: true,
+      liked,
+      likesCount: liked ? (imageData.likesCount || currentLikes.length) + 1 : (imageData.likesCount || currentLikes.length) - 1
+    });
+  } catch (error) {
+    logger.error('Error al dar/quitar like:', error);
+    return reply.code(500).send({ error: 'Error interno del servidor' });
   }
 };
 

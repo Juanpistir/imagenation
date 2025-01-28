@@ -129,9 +129,15 @@
                         alt='{{user.displayName}}'
                       />
                     {{else}}
-                      <div class='h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center'>
-                        <i class='fas fa-user text-gray-500'></i>
-                      </div>
+                      {{#if user.displayName}}
+                        <div class='h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center font-medium uppercase'>
+                          {{firstChar user.displayName}}
+                        </div>
+                      {{else}}
+                        <div class='h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center'>
+                          <i class='fas fa-user text-gray-500'></i>
+                        </div>
+                      {{/if}}
                     {{/if}}
                     <div class="ml-3 hidden sm:flex flex-col text-left">
                       {{#if user.displayName}}
