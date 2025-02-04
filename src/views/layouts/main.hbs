@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{title}} - Imagenation</title>
     
-
     {{!-- Firebase CDN --}}
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -20,18 +19,22 @@
     <link rel="icon" type="image/x-icon" href="/public/favicon.ico">
 
     {{!-- Alpine.js y otras dependencias desde CDN --}}
-    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/timeago.js@4.0.2/dist/timeago.min.js"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="/public/js/authAlpine.js"></script>
+    <script src="/public/js/searchAlpine.js"></script>
     <script src="/public/js/profileAlpine.js"></script>
-
+    <script src="/public/js/imageAlpine.js"></script>
+    <script src="/public/js/imageActions.js"></script>
 
     {{!-- Pasar datos del usuario al cliente --}}
     <script>
-        const USER_JSON = JSON.parse(`{{{json user}}}`);
+        window.USER_DATA = {
+            user: {{{json user}}},
+            isAuthenticated: {{#if user}}true{{else}}false{{/if}}
+        };
     </script>
-
 
 </head>
 <body>

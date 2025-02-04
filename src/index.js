@@ -130,6 +130,7 @@ async function build(opts = {}) {
     await app.register(import('./routes/auth.js'));
     await app.register(import('./routes/profile.js'));
     await app.register(import('./routes/images.js'));
+    await app.register(import('./routes/collections.js'));
     await app.register(import('./routes/index.js'));
 
     // Manejador de errores global

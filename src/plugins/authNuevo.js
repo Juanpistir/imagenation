@@ -2,6 +2,12 @@ import fp from 'fastify-plugin';
 import { adminDb, verifyFirebaseToken } from '../config/firebase.js';
 
 async function firebaseAuth(fastify, options) {
+  // Decorar fastify con firebase
+  fastify.decorate('firebase', {
+    adminDb,
+    verifyFirebaseToken,
+  });
+
   const FBAuth = async (req, reply) => {
     const token = req.cookies?.firebaseToken || req.headers.authorization?.split('Bearer ')[1];
 
@@ -11,7 +17,7 @@ async function firebaseAuth(fastify, options) {
     if (token) {
       try {
         const decodedToken = await verifyFirebaseToken(token);
-        
+
         // Obtener datos completos del usuario desde Firestore
         const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
         const userData = userDoc.exists ? userDoc.data() : null;

@@ -8,31 +8,77 @@ document.addEventListener('alpine:init', () => {
     activeTab: 'posts',
     likedImages: [],
     collections: [],
-    profile: window.PROFILE_DATA || {
-      id: '',
-      uid: '',
-      email: '',
-      username: '',
-      displayName: '',
-      bio: '',
-      photoURL: '',
-      bannerURL: '',
-      createdAt: null,
-      updatedAt: null,
-      role: 'user',
-      isActive: true,
-      images: [],
+    showNewCollectionModal: false,
+    profile: {
+      ...(window.PROFILE_DATA || {}),
+      username: window.PROFILE_DATA?.username || '',
+      displayName: window.PROFILE_DATA?.displayName || '',
+      bio: window.PROFILE_DATA?.bio || '',
+      photoURL: window.PROFILE_DATA?.photoURL || '',
+      uid: window.PROFILE_DATA?.uid || '',
+      email: window.PROFILE_DATA?.email || '',
+      role: window.PROFILE_DATA?.role || 'user',
+      isActive: window.PROFILE_DATA?.isActive ?? true,
+      images: window.PROFILE_DATA?.images || [],
     },
+    // Inicializar formData con valores por defecto
     formData: {
-      displayName: '',
-      username: '',
-      bio: '',
+      displayName: window.PROFILE_DATA?.displayName || '',
+      username: window.PROFILE_DATA?.username || '',
+      bio: window.PROFILE_DATA?.bio || '',
       photoFile: null,
       bannerFile: null,
     },
 
     async init() {
-      if (this.profile) {
+      try {
+        const auth = Alpine.store('auth');
+
+        // Debug de comparación UIDs
+        console.log('Debug Comparación UIDs:', {
+          'Auth.isAuthenticated': auth?.isAuthenticated,
+          'Auth.currentUser': auth?.currentUser,
+          'Profile.uid': this.profile?.uid,
+          'Son iguales?': auth?.currentUser === this.profile?.uid,
+          'Tipo Auth.currentUser': typeof auth?.currentUser,
+          'Tipo Profile.uid': typeof this.profile?.uid,
+        });
+
+        // Esperar a que la autenticación esté lista
+        await new Promise((resolve) => {
+          if (auth?.isAuthenticated && auth?.currentUser) {
+            resolve();
+          } else {
+            const checkAuth = () => {
+              if (auth?.isAuthenticated && auth?.currentUser) {
+                document.removeEventListener('alpine:init', checkAuth);
+                resolve();
+              }
+            };
+            document.addEventListener('alpine:init', checkAuth);
+            // Timeout de seguridad después de 5 segundos
+            setTimeout(() => {
+              document.removeEventListener('alpine:init', checkAuth);
+              resolve();
+            }, 5000);
+          }
+        });
+
+        // Si no hay datos de perfil, intentar obtener del auth store
+        if (!this.profile.username && auth?.userData) {
+          const userData = auth.userData;
+          this.profile = {
+            ...this.profile,
+            uid: auth?.currentUser?.uid || '',
+            username: userData?.username || '',
+            displayName: userData?.displayName || '',
+            email: userData?.email || '',
+            photoURL: userData?.photoURL || '',
+            bio: userData?.bio || '',
+          };
+        }
+
+        // Actualizar formData con los datos actuales
         this.formData = {
           displayName: this.profile.displayName || '',
           username: this.profile.username || '',
@@ -41,11 +87,21 @@ document.addEventListener('alpine:init', () => {
           bannerFile: null,
         };
 
-        // Cargar datos iniciales
-        await Promise.all([
-          this.loadLikedImages(),
-          this.loadCollections()
-        ]);
+        // Observar cambios en la autenticación usando Alpine.effect
+        Alpine.effect(() => {
+          const currentUser = Alpine.store('auth')?.currentUser;
+          if (currentUser) {
+            this.profile.uid = currentUser.uid;
+            this.loadLikedImages();
+            this.loadCollections();
+          }
+        });
+
+        // Cargar datos adicionales de manera segura
+        await this.loadLikedImages();
+        await this.loadCollections();
+      } catch (error) {
+        console.error('Error en inicialización del perfil:', error);
       }
     },
 
@@ -60,14 +116,66 @@ document.addEventListener('alpine:init', () => {
 
     async loadLikedImages() {
       try {
+        const auth = Alpine.store('auth');
+        if (!auth?.currentUser?.uid) {
+          console.warn('No hay usuario autenticado para cargar likes');
+          return;
+        }
+
         this.isLoading = true;
-        const response = await fetch(`/profile/${this.profile.username}/likes`);
-        if (response.ok) {
-          const data = await response.json();
-          this.likedImages = Array.isArray(data) ? data : [];
+        
+        // Asegurar que userId sea un string válido
+        const userId = auth?.currentUser?.uid || this.profile?.uid;
+        
+        if (!userId) {
+          console.warn('No se pudo obtener un ID de usuario válido');
+          return;
+        }
+
+        console.log('[PROFILE] Cargando likes para usuario:', userId);
+
+        const response = await fetch(`/profile/${userId}/likes`, {
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Error loading liked images: ${response.status} - ${errorText}`);
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          throw new Error('La respuesta del servidor no es JSON válido');
+        }
+
+        const data = await response.json();
+        console.log('[PROFILE] Respuesta de likes:', data);
+
+        if (Array.isArray(data.likes)) {
+          this.likedImages = data.likes.map(image => ({
+            ...image,
+            mainImageUrl: image.mainImageUrl || image.url || '',
+            title: image.title || 'Sin título'
+          }));
+          
+          console.log('[PROFILE] Array de likes actualizado:', {
+            timestamp: new Date().toISOString(),
+            totalLikes: this.likedImages.length,
+            likes: this.likedImages,
+          });
+        } else {
+          console.error('Formato de respuesta inválido para likes:', data);
+          this.likedImages = [];
         }
       } catch (error) {
         console.error('Error loading liked images:', error);
+        window.Toast.fire({
+          icon: 'error',
+          title: error.message || 'Error al cargar imágenes con like',
+        });
+        this.likedImages = [];
       } finally {
         this.isLoading = false;
       }
@@ -75,17 +183,31 @@ document.addEventListener('alpine:init', () => {
 
     async loadCollections() {
       try {
-        this.isLoading = true;
-        const response = await fetch(`/profile/${this.profile.username}/collections`);
-        if (response.ok) {
-          const data = await response.json();
-          this.collections = Array.isArray(data) ? data : [];
-        }
+        const auth = Alpine.store('auth');
+        if (!auth.currentUser) return;
+
+        const response = await fetch(`/profile/${auth.currentUser.uid}/collections`);
+        if (!response.ok) throw new Error('Error loading collections');
+
+        const data = await response.json();
+        this.collections = data.collections || [];
       } catch (error) {
         console.error('Error loading collections:', error);
+        window.Toast.fire({
+          icon: 'error',
+          title: 'Error loading collections',
+        });
       } finally {
         this.isLoading = false;
       }
+    },
+
+    openNewCollectionModal() {
+      this.showNewCollectionModal = true;
+    },
+
+    closeNewCollectionModal() {
+      this.showNewCollectionModal = false;
     },
 
     async handleLikeToggle(imageId) {
@@ -93,18 +215,25 @@ document.addEventListener('alpine:init', () => {
         const response = await fetch(`/images/${imageId}/like`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
-          }
+            'Content-Type': 'application/json',
+          },
         });
 
-        if (response.ok) {
-          const result = await response.json();
-          // Recargar los likes si estamos en la tab de likes
-          if (this.activeTab === 'likes') {
-            await this.loadLikedImages();
-          }
-          return result;
+        if (!response.ok) throw new Error('Error toggling like');
+
+        const result = await response.json();
+        console.log('[PROFILE] Estado del like cambiado:', {
+          imageId,
+          liked: result.liked,
+          likesCount: result.likesCount,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Recargar los likes si estamos en la tab de likes
+        if (this.activeTab === 'likes') {
+          await this.loadLikedImages();
         }
+        return result;
       } catch (error) {
         console.error('Error toggling like:', error);
       }
@@ -155,7 +284,7 @@ document.addEventListener('alpine:init', () => {
       this.usernameChecking = true;
       try {
         const response = await fetch(
-          `/profile/check-username?username=${encodeURIComponent(username)}`,
+          `/api/profile/check-username?username=${encodeURIComponent(username)}`,
           {
             headers: {
               Accept: 'application/json',
@@ -163,9 +292,7 @@ document.addEventListener('alpine:init', () => {
           }
         );
 
-        if (!response.ok) {
-          throw new Error('Error al verificar username');
-        }
+        if (!response.ok) throw new Error('Error al verificar username');
 
         const data = await response.json();
         this.usernameAvailable = data.available;
@@ -217,10 +344,7 @@ document.addEventListener('alpine:init', () => {
           },
         });
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Error al actualizar perfil');
-        }
+        if (!response.ok) throw new Error('Error al actualizar perfil');
 
         const result = await response.json();
 

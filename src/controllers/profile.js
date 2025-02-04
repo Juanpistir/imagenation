@@ -1,30 +1,28 @@
 import { getLogger } from '../utils/logger.js';
 import cloudinary from '../config/cloudinary.js';
-import { adminDb } from '../config/firebase.js';
 import { normalizeUserData, prepareUserDataForClient } from '../utils/userUtils.js';
 
 const logger = getLogger('Profile Controller', '');
 
-export const getProfile = async (request, reply) => {
+export async function getProfile(request, reply) {
   try {
-    const { id } = request.params;
-    logger.info('Obteniendo perfil para ID:', id);
-    logger.info('Datos del usuario actual:', request.user);
+    const { userId } = request.params;
+    logger.info('Obteniendo perfil para ID:', { userId });
 
-    if (!id) {
+    if (!userId) {
       logger.error('ID de usuario no proporcionado');
       return reply.code(400).send({ error: 'ID de usuario es requerido' });
     }
 
-    // Obtener el perfil del usuario de Firestore
-    const userDoc = await adminDb.collection('users').doc(id).get();
-    logger.info('Datos obtenidos de Firestore:', {
-      exists: userDoc.exists,
-      id: userDoc.id,
-    });
+    // Obtener datos del usuario actual
+    const currentUser = request.user;
+    logger.info('Datos del usuario actual:', currentUser);
+
+    // Verificar que el usuario existe
+    const userDoc = await request.server.firebase.adminDb.collection('users').doc(userId).get();
 
     if (!userDoc.exists) {
-      logger.error(`Usuario no encontrado con ID: ${id}`);
+      logger.error(`Usuario no encontrado con ID: ${userId}`);
       return reply.code(404).send({ error: 'Usuario no encontrado' });
     }
 
@@ -37,13 +35,16 @@ export const getProfile = async (request, reply) => {
 
     // Obtener las imágenes del usuario con paginación
     const limit = 12; // Número de imágenes por página
-    const lastImageDoc = request.query.lastImageId 
-      ? await adminDb.collection('images').doc(request.query.lastImageId).get()
+    const lastImageDoc = request.query.lastImageId
+      ? await request.server.firebase.adminDb
+          .collection('images')
+          .doc(request.query.lastImageId)
+          .get()
       : null;
 
-    let imagesQuery = adminDb
+    let imagesQuery = request.server.firebase.adminDb
       .collection('images')
-      .where('userId', '==', id)
+      .where('userId', '==', userId)
       .orderBy('createdAt', 'desc')
       .limit(limit);
 
@@ -94,13 +95,13 @@ export const getProfile = async (request, reply) => {
       statusCode: 500,
     });
   }
-};
+}
 
 // Verificar disponibilidad de username
-export const checkUsername = async (request, reply) => {
+export async function checkUsername(request, reply) {
   try {
     const { username } = request.query;
-    const currentUserId = request.user?.uid; // Hacer opcional el uid del usuario
+    const currentUserId = request.user?.uid;
 
     if (!username) {
       logger.error('Username no proporcionado');
@@ -108,7 +109,7 @@ export const checkUsername = async (request, reply) => {
     }
 
     // Buscar usuarios con el mismo username
-    const usersRef = adminDb.collection('users');
+    const usersRef = request.server.firebase.adminDb.collection('users');
     const snapshot = await usersRef.where('username', '==', username.toLowerCase()).get();
 
     // El username está disponible si:
@@ -125,251 +126,262 @@ export const checkUsername = async (request, reply) => {
     logger.error('Error al verificar username:', error);
     return reply.code(500).send({ error: 'Error al verificar username' });
   }
-};
+}
 
-export const updateProfile = async (request, reply) => {
+export async function updateProfile(request, reply) {
   try {
-    const { id } = request.params;
+    const { userId } = request.params;
+    const currentUser = request.user;
+    logger.info('🔍 Iniciando actualización de perfil:', { userId, currentUser });
 
-    // Verificar que el usuario autenticado sea el mismo que se intenta actualizar
-    if (request.user.uid !== id) {
-      logger.error('Usuario no autorizado para actualizar este perfil');
+    if (!currentUser || currentUser.uid !== userId) {
+      logger.error('❌ Usuario no autorizado para actualizar este perfil');
       return reply.code(403).send({ error: 'No autorizado para actualizar este perfil' });
     }
 
-    // Obtener los campos del form data
-    const formData = {};
+    // Verificar si es una petición multipart o JSON
+    const contentType = request.headers['content-type'] || '';
+    const isMultipart = contentType.includes('multipart/form-data');
+    logger.info('📝 Tipo de contenido:', { contentType, isMultipart });
 
-    // Procesar los campos del formulario
-    const fields = await request.parts();
+    let formData = {};
 
-    for await (const part of fields) {
-      if (part.type === 'field') {
-        formData[part.fieldname] = part.value;
-      } else {
-        // Si es un archivo, guardarlo para procesarlo después
-        if (part.fieldname === 'photo' || part.fieldname === 'banner') {
+    if (isMultipart) {
+      logger.info('📦 Procesando datos multipart');
+      const parts = await request.parts();
+
+      for await (const part of parts) {
+        logger.info('📄 Procesando parte:', {
+          type: part.type,
+          fieldname: part.fieldname,
+          filename: part.filename,
+          mimetype: part.mimetype,
+        });
+
+        if (part.type === 'field') {
+          formData[part.fieldname] = part.value;
+        } else if (part.fieldname === 'photo' || part.fieldname === 'banner') {
           formData[part.fieldname] = part;
         }
       }
+    } else {
+      logger.info('📦 Procesando datos JSON:', request.body);
+      formData = request.body;
     }
 
-    // Validar los campos actualizables
-    const allowedUpdates = ['displayName', 'username', 'bio'];
+    logger.info('📝 Datos del formulario procesados:', {
+      ...formData,
+      photo: formData.photo ? 'Buffer presente' : 'No hay foto',
+      banner: formData.banner ? 'Buffer presente' : 'No hay banner',
+    });
+
+    // Validar campos requeridos
+    if (!formData.displayName || !formData.username) {
+      logger.error('❌ Campos requeridos faltantes:', { formData });
+      return reply.code(400).send({ error: 'Nombre y username son requeridos' });
+    }
+
+    const allowedUpdates = ['displayName', 'username', 'biography'];
     const updateData = {};
 
-    // Procesar los campos de texto
     for (const field of allowedUpdates) {
       if (formData[field] !== undefined && formData[field] !== null) {
         updateData[field] = formData[field];
       }
     }
 
-    // Si se incluye username, verificar que esté disponible
+    logger.info('📝 Datos a actualizar:', updateData);
+
     if (updateData.username) {
-      const usernameCheck = await adminDb
+      logger.info('🔍 Verificando disponibilidad de username:', updateData.username);
+      const usernameCheck = await request.server.firebase.adminDb
         .collection('users')
         .where('username', '==', updateData.username.toLowerCase())
         .get();
 
-      if (!usernameCheck.empty && usernameCheck.docs[0].id !== id) {
+      if (!usernameCheck.empty && usernameCheck.docs[0].id !== userId) {
+        logger.error('❌ Username no disponible');
         return reply.code(400).send({ error: 'Username no disponible' });
       }
 
-      // Convertir username a minúsculas
       updateData.username = updateData.username.toLowerCase();
     }
 
-    // Procesar archivos si existen
+    // Procesar foto de perfil si existe
     if (formData.photo) {
       try {
-        const buffer = await formData.photo.toBuffer();
+        logger.info('📸 Procesando foto de perfil');
+        const buffer = isMultipart ? await formData.photo.toBuffer() : Buffer.from(formData.photo);
+
+        logger.info('📸 Buffer de foto creado, tamaño:', buffer.length);
+
         const result = await new Promise((resolve, reject) => {
-          cloudinary.uploader
-            .upload_stream(
-              {
-                folder: 'avatars',
-                width: 400,
-                height: 400,
-                crop: 'fill',
-                gravity: 'face',
-              },
-              (error, result) => {
-                if (error) {
-                  logger.error('Error al subir foto de perfil a Cloudinary:', error);
-                  reject(error);
-                }
+          const uploadStream = cloudinary.uploader.upload_stream(
+            {
+              folder: 'avatars',
+              width: 400,
+              height: 400,
+              crop: 'fill',
+              gravity: 'face',
+            },
+            (error, result) => {
+              if (error) {
+                logger.error('❌ Error en Cloudinary:', error);
+                reject(error);
+              } else {
+                logger.info('✅ Foto subida a Cloudinary:', result);
                 resolve(result);
               }
-            )
-            .end(buffer);
+            }
+          );
+
+          logger.info('📤 Enviando buffer a Cloudinary');
+          uploadStream.end(buffer);
         });
 
-        // Actualizar tanto photoURL como avatarUrl
         updateData.photoURL = result.secure_url;
-        updateData.avatarUrl = result.secure_url;
-        updateData.avatarPublicId = result.public_id;
+        logger.info('✅ URL de foto actualizada:', result.secure_url);
       } catch (error) {
-        logger.error('Error al subir foto de perfil a Cloudinary:', error);
+        logger.error('❌ Error al subir foto de perfil:', error);
         return reply.code(500).send({ error: 'Error al subir foto de perfil' });
       }
     }
 
+    // Procesar banner si existe
     if (formData.banner) {
       try {
-        const buffer = await formData.banner.toBuffer();
+        logger.info('🖼️ Procesando banner');
+        const buffer = isMultipart
+          ? await formData.banner.toBuffer()
+          : Buffer.from(formData.banner);
+
+        logger.info('🖼️ Buffer de banner creado, tamaño:', buffer.length);
+
         const result = await new Promise((resolve, reject) => {
-          cloudinary.uploader
-            .upload_stream(
-              {
-                folder: 'banners',
-                width: 1500,
-                height: 500,
-                crop: 'fill',
-              },
-              (error, result) => {
-                if (error) {
-                  logger.error('Error al subir banner a Cloudinary:', error);
-                  reject(error);
-                }
+          const uploadStream = cloudinary.uploader.upload_stream(
+            {
+              folder: 'banners',
+              width: 1200,
+              height: 400,
+              crop: 'fill',
+            },
+            (error, result) => {
+              if (error) {
+                logger.error('❌ Error en Cloudinary:', error);
+                reject(error);
+              } else {
+                logger.info('✅ Banner subido a Cloudinary:', result);
                 resolve(result);
               }
-            )
-            .end(buffer);
+            }
+          );
+
+          logger.info('📤 Enviando buffer a Cloudinary');
+          uploadStream.end(buffer);
         });
 
         updateData.bannerURL = result.secure_url;
-        updateData.bannerUrl = result.secure_url;
-        updateData.bannerPublicId = result.public_id;
+        logger.info('✅ URL de banner actualizada:', result.secure_url);
       } catch (error) {
-        logger.error('Error al subir banner a Cloudinary:', error);
+        logger.error('❌ Error al subir banner:', error);
         return reply.code(500).send({ error: 'Error al subir banner' });
       }
     }
 
-    // Actualizar el documento en Firestore
-    await adminDb
-      .collection('users')
-      .doc(id)
-      .update({
-        ...updateData,
-        updatedAt: new Date().toISOString(),
-      });
+    // Actualizar perfil en Firebase
+    logger.info('🔄 Actualizando perfil en Firebase:', updateData);
+    const userRef = request.server.firebase.adminDb.collection('users').doc(userId);
+    await userRef.update(updateData);
 
-    // Obtener el documento actualizado
-    const updatedDoc = await adminDb.collection('users').doc(id).get();
-    const updatedData = updatedDoc.data();
+    // Obtener datos actualizados
+    const updatedDoc = await userRef.get();
+    const userData = updatedDoc.data();
 
-    return reply.send({
+    // Preparar datos para la respuesta
+    const responseData = {
+      ...userData,
+      id: updatedDoc.id,
+    };
+
+    logger.info('✅ Perfil actualizado exitosamente:', responseData);
+
+    return reply.code(200).send({
       success: true,
-      profile: prepareUserDataForClient(updatedData),
+      message: 'Perfil actualizado exitosamente',
+      data: responseData,
     });
   } catch (error) {
-    logger.error('Error al actualizar perfil:', error);
+    logger.error('❌ Error al actualizar perfil:', error);
     return reply.code(500).send({ error: 'Error al actualizar perfil' });
   }
-};
+}
 
-// Obtener imágenes que le gustan al usuario
-export const getLikedImages = async (request, reply) => {
+export async function getLikedImages(request, reply) {
   try {
-    const { username } = request.params;
+    const { userId } = request.params;
 
-    // Primero obtener el ID del usuario por username
-    const userSnapshot = await adminDb
-      .collection('users')
-      .where('username', '==', username)
-      .limit(1)
-      .get();
-
-    if (userSnapshot.empty) {
-      return reply.code(404).send({ error: 'Usuario no encontrado' });
+    if (!userId) {
+      logger.error('ID de usuario no proporcionado');
+      return reply.code(400).send({ error: 'ID de usuario es requerido' });
     }
 
-    const userId = userSnapshot.docs[0].id;
+    const likesRef = await request.server.firebase.adminDb
+      .collection('likes')
+      .where('userId', '==', userId)
+      .get();
 
-    // Obtener los likes del usuario
-    const likesSnapshot = await adminDb.collection('likes').where('userId', '==', userId).get();
+    const likes = [];
+    const imagePromises = likesRef.docs.map(async (likeDoc) => {
+      const likeData = likeDoc.data();
+      const imageDoc = await request.server.firebase.adminDb
+        .collection('images')
+        .doc(likeData.imageId)
+        .get();
 
-    // Obtener los IDs de las imágenes con like
-    const imageIds = likesSnapshot.docs.map((doc) => doc.data().imageId);
-
-    // Obtener los detalles de las imágenes
-    const imagesPromises = imageIds.map(async (imageId) => {
-      const imageDoc = await adminDb.collection('images').doc(imageId).get();
-      if (imageDoc.exists) {
-        return {
-          id: imageDoc.id,
-          ...imageDoc.data(),
-        };
+      if (!imageDoc.exists) {
+        logger.warn(`Imagen ${likeData.imageId} no encontrada para el like ${likeDoc.id}`);
+        return null;
       }
-      return null;
+
+      return {
+        id: imageDoc.id,
+        ...imageDoc.data(),
+        likeId: likeDoc.id,
+      };
     });
 
-    const images = (await Promise.all(imagesPromises)).filter((img) => img !== null);
+    const likedImages = (await Promise.all(imagePromises)).filter(Boolean);
 
-    return reply.send(images);
+    logger.info(`Obtenidas ${likedImages.length} imágenes con like para el usuario ${userId}`);
+    return reply.send({ likes: likedImages });
   } catch (error) {
     logger.error('Error al obtener imágenes con like:', error);
     return reply.code(500).send({ error: 'Error al obtener imágenes con like' });
   }
-};
+}
 
-// Obtener colecciones del usuario
-export const getCollections = async (request, reply) => {
+export async function getCollections(request, reply) {
   try {
-    const { username } = request.params;
+    const { userId } = request.params;
 
-    // Primero obtener el ID del usuario por username
-    const userSnapshot = await adminDb
-      .collection('users')
-      .where('username', '==', username)
-      .limit(1)
-      .get();
-
-    if (userSnapshot.empty) {
-      return reply.code(404).send({ error: 'Usuario no encontrado' });
+    if (!userId) {
+      logger.error('ID de usuario no proporcionado');
+      return reply.code(400).send({ error: 'ID de usuario es requerido' });
     }
 
-    const userId = userSnapshot.docs[0].id;
-
-    // Obtener las colecciones del usuario
-    const collectionsSnapshot = await adminDb
+    const collectionsRef = await request.server.firebase.adminDb
       .collection('collections')
       .where('userId', '==', userId)
       .get();
 
-    const collections = await Promise.all(
-      collectionsSnapshot.docs.map(async (doc) => {
-        const collectionData = doc.data();
+    const collections = [];
+    collectionsRef.forEach((doc) => {
+      collections.push({ id: doc.id, ...doc.data() });
+    });
 
-        // Obtener las imágenes de la colección
-        const imagesPromises = collectionData.imageIds.map(async (imageId) => {
-          const imageDoc = await adminDb.collection('images').doc(imageId).get();
-          if (imageDoc.exists) {
-            return {
-              id: imageDoc.id,
-              ...imageDoc.data(),
-            };
-          }
-          return null;
-        });
-
-        const images = (await Promise.all(imagesPromises)).filter((img) => img !== null);
-
-        return {
-          id: doc.id,
-          name: collectionData.name,
-          description: collectionData.description,
-          createdAt: collectionData.createdAt,
-          images,
-        };
-      })
-    );
-
-    return reply.send(collections);
+    return reply.send({ collections });
   } catch (error) {
     logger.error('Error al obtener colecciones:', error);
     return reply.code(500).send({ error: 'Error al obtener colecciones' });
   }
-};
+}

@@ -1,0 +1,7 @@
+[test]
+# Mostrar logs detallados
+logLevel = "debug"
+# No ocultar los console.log durante las pruebas
+silent = false
+# Mostrar el stack trace completo
+bail = true 

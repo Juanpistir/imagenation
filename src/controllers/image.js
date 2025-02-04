@@ -81,15 +81,15 @@ export const getImage = async (request, reply) => {
     const image = {
       id,
       ...imageData,
-      userId, // Usar el userId normalizado
+      userId,
       userEmail: imageUserData?.email || 'Usuario desconocido',
       userDisplayName: imageUserData?.displayName || 'Usuario desconocido',
       userPhotoURL: imageUserData?.photoURL || '',
       comments,
-      likes: Array.isArray(imageData.likes) ? imageData.likes.length : 0,
-      hasLiked: Array.isArray(imageData.likes) && imageData.likes.includes(currentUserData?.uid),
+      likes: likesSnapshot.size,
+      hasLiked: likesSnapshot.docs.some(doc => doc.data().userId === currentUserData?.uid),
       isAuthenticated: !!currentUserData,
-      isOwner: currentUserData?.uid === userId, // Usar el userId normalizado
+      isOwner: currentUserData?.uid === userId,
       user: currentUserData,
     };
 
@@ -100,11 +100,14 @@ export const getImage = async (request, reply) => {
       isOwner: image.isOwner,
     });
 
-    // Renderizar la vista con los datos
-    return reply.view('image', {
+    return reply.view('image.hbs', { 
       image,
-      user: currentUserData,
-      error: null,
+      layout: 'main',
+      helpers: {
+        json: function(context) {
+          return JSON.stringify(context);
+        }
+      }
     });
   } catch (error) {
     logger.error('Error obteniendo imagen:', error);
@@ -470,10 +473,7 @@ export const toggleLike = async (request, reply) => {
     const imageRef = adminDb.collection('images').doc(id);
     const likeRef = adminDb.collection('likes').doc(`${userId}_${id}`);
 
-    const [imageDoc, likeDoc] = await Promise.all([
-      imageRef.get(),
-      likeRef.get()
-    ]);
+    const [imageDoc, likeDoc] = await Promise.all([imageRef.get(), likeRef.get()]);
 
     if (!imageDoc.exists) {
       return reply.code(404).send({ error: 'Imagen no encontrada' });
@@ -488,19 +488,19 @@ export const toggleLike = async (request, reply) => {
       // Remove like
       batch.delete(likeRef);
       batch.update(imageRef, {
-        likes: currentLikes.filter(uid => uid !== userId),
-        likesCount: (imageData.likesCount || currentLikes.length) - 1
+        likes: currentLikes.filter((uid) => uid !== userId),
+        likesCount: (imageData.likesCount || currentLikes.length) - 1,
       });
     } else {
       // Add like
       batch.set(likeRef, {
         userId,
         imageId: id,
-        createdAt: new Date()
+        createdAt: new Date(),
       });
       batch.update(imageRef, {
         likes: [...currentLikes, userId],
-        likesCount: (imageData.likesCount || currentLikes.length) + 1
+        likesCount: (imageData.likesCount || currentLikes.length) + 1,
       });
       liked = true;
     }
@@ -510,7 +510,9 @@ export const toggleLike = async (request, reply) => {
     return reply.send({
       success: true,
       liked,
-      likesCount: liked ? (imageData.likesCount || currentLikes.length) + 1 : (imageData.likesCount || currentLikes.length) - 1
+      likesCount: liked
+        ? (imageData.likesCount || currentLikes.length) + 1
+        : (imageData.likesCount || currentLikes.length) - 1,
     });
   } catch (error) {
     logger.error('Error al dar/quitar like:', error);

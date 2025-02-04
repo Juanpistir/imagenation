@@ -25,32 +25,37 @@
                         <div class="sm:flex sm:space-x-5">
                             <div class="flex-shrink-0">
                                 <template x-if="$store.profile.profile.photoURL">
-                                    <img class="mx-auto h-32 w-32 rounded-full border-4 border-white shadow-lg object-cover"
+                                    <img class="mx-auto h-32 w-32 rounded-full border-4 border-white shadow-lg object-cover" 
                                          :src="$store.profile.profile.photoURL" 
-                                         :alt="$store.profile.profile.displayName">
+                                         :alt="$store.profile.profile.displayName || 'Profile Photo'">
                                 </template>
-                                <template x-if="!$store.profile.profile.photoURL && $store.profile.profile.displayName">
+                                <template x-if="!$store.profile.profile.photoURL">
                                     <div class="mx-auto h-32 w-32 rounded-full border-4 border-white shadow-lg bg-primary text-white flex items-center justify-center text-4xl font-medium uppercase">
-                                        <span x-text="$store.profile.profile.displayName.charAt(0)"></span>
+                                        <span x-text="($store.profile.profile.displayName || $store.profile.profile.username || '?').charAt(0)"></span>
                                     </div>
                                 </template>
                             </div>
                             <div class="mt-4 sm:mt-0 sm:pt-1 sm:text-left">
-                                <p class="text-sm text-gray-600" x-text="'@' + $store.profile.profile.username"></p>
-                                <h1 class="text-2xl font-bold text-gray-900 sm:text-3xl" x-text="$store.profile.profile.displayName"></h1>
-                                <p class="text-gray-600 mt-2" x-text="$store.profile.profile.bio"></p>
+                                <p class="text-sm text-gray-600" x-show="$store.profile.profile.username">
+                                    <span x-text="'@' + ($store.profile.profile.username || '')"></span>
+                                </p>
+                                <h1 class="text-2xl font-bold text-gray-900 sm:text-3xl" 
+                                    x-text="$store.profile.profile.displayName || $store.profile.profile.username || 'Usuario'">
+                                </h1>
+                                <p class="text-gray-600 mt-2" x-show="$store.profile.profile.bio" 
+                                   x-text="$store.profile.profile.bio"></p>
                             </div>
                         </div>
 
                         {{!-- Botones de Acción --}}
                         <div class="mt-5 flex justify-center sm:mt-0">
-                            {{#if (eq user.uid profile.uid)}}
+                            <template x-if="$store.auth.isAuthenticated && $store.auth.userData && $store.auth.userData.user && $store.auth.userData.user.uid === $store.profile.profile.uid">
                                 <button @click="$store.profile.startEditing()" 
-                                        class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                        class="inline-flex justify-center items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
                                     <i class="fas fa-edit mr-2"></i>
                                     Editar Perfil
                                 </button>
-                            {{/if}}
+                            </template>
                         </div>
                     </div>
                 </div>
@@ -102,13 +107,35 @@
 
             {{!-- Likes Tab --}}
             <div x-show="$store.profile.activeTab === 'likes'" x-transition>
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {{!-- Estado de carga --}}
+                <div x-show="$store.profile.isLoading" class="flex justify-center items-center py-8">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                </div>
+
+                {{!-- Estado sin autenticación --}}
+                <div x-show="!$store.auth.isAuthenticated" class="text-center py-8 text-gray-500">
+                    Debes iniciar sesión para ver tus likes
+                </div>
+
+                {{!-- Estado sin likes --}}
+                <div x-show="$store.auth.isAuthenticated && !$store.profile.isLoading && $store.profile.likedImages.length === 0" 
+                     class="text-center py-8 text-gray-500">
+                    No has dado like a ninguna imagen aún
+                </div>
+
+                {{!-- Grid de imágenes --}}
+                <div x-show="$store.profile.likedImages.length > 0" 
+                     class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     <template x-for="image in $store.profile.likedImages" :key="image.id">
-                        <a :href="'/images/' + image.id" class="block">
+                        <a :href="'/images/' + image.id" class="block group">
                             <div class="aspect-w-1 aspect-h-1 w-full overflow-hidden rounded-lg bg-gray-200">
                                 <img :src="image.mainImageUrl" 
                                      :alt="image.title"
-                                     class="h-full w-full object-cover transform transition-all duration-300 hover:scale-105">
+                                     class="h-full w-full object-cover transform transition-all duration-300 group-hover:scale-105">
+                                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300"></div>
+                            </div>
+                            <div class="mt-2">
+                                <h3 x-text="image.title" class="text-sm font-medium text-gray-900 truncate"></h3>
                             </div>
                         </a>
                     </template>
@@ -256,5 +283,6 @@
 
 <script>
     // Inicializar datos del perfil de forma segura
-    window.PROFILE_DATA = {{{ PROFILE_DATA }}};
+    window.PROFILE_DATA = {{{ json profile }}};
+    console.log('Datos del perfil:', window.PROFILE_DATA);
 </script>
