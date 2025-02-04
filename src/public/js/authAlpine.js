@@ -236,5 +236,14 @@ document.addEventListener('alpine:init', () => {
       };
       return errorMessages[code] || 'Error de autenticación desconocido';
     },
+
+    validateAuthState() {
+      if (this.currentUser && this.currentUser.uid !== $store.profile.uid) {
+        console.error('Auth/profile uid mismatch', 
+          { authUid: this.currentUser?.uid, profileUid: $store.profile.uid });
+        return false;
+      }
+      return true;
+    },
   });
 });

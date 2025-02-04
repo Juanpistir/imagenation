@@ -12,6 +12,8 @@ document.addEventListener('alpine:init', () => {
     newCollectionName: '',
     newCollectionDescription: '',
     imageError: false,
+    userCollections: [],
+    showCreateForm: false,
 
     init() {
       this.showCollectionModal = false;
@@ -51,7 +53,22 @@ document.addEventListener('alpine:init', () => {
         }
 
         this.likesCount = data.likesCount || 0;
-        this.comments = data.comments || [];
+        
+        // Asegurarse de que los timestamps sean válidos
+        if (data.comments) {
+          this.comments = data.comments.map(comment => {
+            // Solo actualizar el timestamp si es necesario
+            if (comment.timestamp && typeof comment.timestamp === 'string') {
+              return {
+                ...comment,
+                timestamp: new Date(comment.timestamp).toISOString()
+              };
+            }
+            return comment;
+          });
+        } else {
+          this.comments = [];
+        }
       } catch (error) {
         console.error('Error loading image data:', error);
         this.imageError = true;
@@ -93,21 +110,43 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    openCollectionModal() {
+    async openCollectionModal() {
+      console.log('Abriendo modal de colecciones');
       if (!Alpine.store('auth').isAuthenticated) {
         window.Toast.fire({
           icon: 'error',
-          title: 'Debes iniciar sesión para guardar en colecciones'
+          title: 'Debes iniciar sesión para guardar en colecciones',
         });
         return;
       }
-      this.showCollectionModal = true;
-      console.log('Modal abierto:', this.showCollectionModal); // Debug
+
+      try {
+        this.showCollectionModal = true;
+        console.log('Estado del modal:', this.showCollectionModal);
+        await this.fetchUserCollections();
+      } catch (error) {
+        console.error('Error al abrir el modal:', error);
+      }
     },
 
     closeCollectionModal() {
+      console.log('Cerrando modal de colecciones');
       this.showCollectionModal = false;
-      console.log('Modal cerrado:', this.showCollectionModal); // Debug
+      this.showCreateForm = false;
+    },
+
+    async fetchUserCollections() {
+      console.log('Obteniendo colecciones del usuario');
+      try {
+        const response = await fetch('/api/collections');
+        if (!response.ok) throw new Error('Error fetching collections');
+
+        const collections = await response.json();
+        console.log('Colecciones obtenidas:', collections);
+        this.userCollections = collections;
+      } catch (error) {
+        console.error('Error al obtener colecciones:', error);
+      }
     },
 
     focusComment() {
@@ -196,10 +235,7 @@ document.addEventListener('alpine:init', () => {
 
     async addToCollection(collectionId) {
       try {
-        const auth = Alpine.store('auth');
-        const userId = auth.currentUser?.uid;
-
-        if (!userId) {
+        if (!Alpine.store('auth').isAuthenticated) {
           window.Toast.fire({
             icon: 'error',
             title: 'Please log in to add to collections',
@@ -207,19 +243,15 @@ document.addEventListener('alpine:init', () => {
           return;
         }
 
-        const response = await fetch(`/images/${collectionId}/images`, {
+        const response = await fetch(`/api/collections/${collectionId}/images/${imageId}`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ imageId }),
         });
 
         if (!response.ok) throw new Error('Failed to add to collection');
 
         window.Toast.fire({
           icon: 'success',
-          title: 'Added to collection',
+          title: 'Added to collection!',
         });
 
         this.showCollectionModal = false;
@@ -227,57 +259,40 @@ document.addEventListener('alpine:init', () => {
         console.error('Error adding to collection:', error);
         window.Toast.fire({
           icon: 'error',
-          title: 'Error adding to collection',
+          title: error.message,
         });
       }
     },
 
     async createCollection() {
-      if (!this.newCollectionName?.trim()) {
-        window.Toast.fire({
-          icon: 'error',
-          title: 'El nombre de la colección es requerido'
-        });
-        return;
-      }
+      console.log('Creando nueva colección:', {
+        name: this.newCollectionName,
+        description: this.newCollectionDescription,
+      });
 
       try {
-        this.isLoading = true;
         const response = await fetch('/api/collections', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Alpine.store('auth').currentUser?.token}`
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: this.newCollectionName.trim(),
-            description: this.newCollectionDescription?.trim() || ''
-          })
+            name: this.newCollectionName,
+            description: this.newCollectionDescription,
+          }),
         });
 
-        if (!response.ok) {
-          const error = await response.text();
-          throw new Error(error || 'Error al crear la colección');
-        }
-        
+        if (!response.ok) throw new Error('Error creating collection');
+
         const newCollection = await response.json();
-        this.collections = [...this.collections, newCollection];
+        console.log('Colección creada:', newCollection);
+
+        await this.fetchUserCollections();
+        this.showCreateForm = false;
         this.newCollectionName = '';
         this.newCollectionDescription = '';
-        this.showCollectionModal = false;
-        
-        window.Toast.fire({
-          icon: 'success',
-          title: 'Colección creada exitosamente'
-        });
+        window.Toast.fire({ icon: 'success', title: 'Colección creada exitosamente' });
       } catch (error) {
-        console.error('Error:', error);
-        window.Toast.fire({
-          icon: 'error',
-          title: error.message
-        });
-      } finally {
-        this.isLoading = false;
+        console.error('Error al crear colección:', error);
+        window.Toast.fire({ icon: 'error', title: 'Error al crear la colección' });
       }
     },
   }));

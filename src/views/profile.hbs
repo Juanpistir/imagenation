@@ -135,7 +135,7 @@
                                 <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300"></div>
                             </div>
                             <div class="mt-2">
-                                <h3 x-text="image.title" class="text-sm font-medium text-gray-900 truncate"></h3>
+                                <h3 class="text-sm font-medium text-gray-900 truncate" x-text="image.title"></h3>
                             </div>
                         </a>
                     </template>
@@ -143,21 +143,32 @@
             </div>
 
             {{!-- Collections Tab --}}
-            <div x-show="$store.profile.activeTab === 'collections'" x-transition>
+            <div x-show="$store.profile.activeTab === 'collections'" x-transition
+                 x-init="console.log('Collections:', $store.profile.collections)">
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     <template x-for="collection in $store.profile.collections" :key="collection.id">
-                        <div class="bg-white rounded-lg shadow p-4">
-                            <h3 class="text-lg font-semibold mb-2" x-text="collection.name"></h3>
-                            <div class="grid grid-cols-3 gap-2">
-                                <template x-for="image in collection.images.slice(0, 3)" :key="image.id">
-                                    <div class="aspect-square overflow-hidden rounded">
-                                        <img :src="image.mainImageUrl" 
-                                             :alt="image.title"
-                                             class="w-full h-full object-cover">
+                        <a :href="`/collections/${collection.id}`" 
+                           class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4"
+                           @click="console.log('Collection clicked:', collection)">
+                            <div class="aspect-w-16 aspect-h-9 mb-4">
+                                <template x-if="collection.images && collection.images.length > 0">
+                                    <img :src="collection.images[0].mainImageUrl || collection.images[0].imageUrl" 
+                                         class="w-full h-48 object-cover rounded-lg" 
+                                         :alt="collection.name"
+                                         @error="console.log('Image error:', {
+                                             collection: collection.id,
+                                             image: collection.images[0]
+                                         })">
+                                </template>
+                                <template x-if="!collection.images || collection.images.length === 0">
+                                    <div class="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+                                        <span class="text-gray-400">Sin imágenes</span>
                                     </div>
                                 </template>
                             </div>
-                        </div>
+                            <h3 class="font-semibold text-lg mb-1" x-text="collection.name"></h3>
+                            <p class="text-sm text-gray-500" x-text="`${(collection.images || []).length} imágenes`"></p>
+                        </a>
                     </template>
                 </div>
             </div>

@@ -63,7 +63,7 @@
             <span>{{image.userEmail}}</span>
             <span class="mx-2">•</span>
             <i class="far fa-clock mr-2"></i>
-            <span>{{timeago image.timestamp}}</span>
+            <p class="text-xs text-gray-500">{{formatDate image.timestamp}}</p>
         </div>
 
         {{#if image.description}}
@@ -169,7 +169,7 @@
                                 </div>
                                 <div>
                                     <p class="font-medium text-gray-900">{{this.userEmail}}</p>
-                                    <p class="text-xs text-gray-500">{{timeago this.timestamp}}</p>
+                                    <p class="text-xs text-gray-500">{{formatDate this.timestamp}}</p>
                                 </div>
                             </div>
                             <p class="text-gray-600 mt-1">{{this.text}}</p>
@@ -189,48 +189,77 @@
 
         {{#if user}}
         <!-- Modal de Colecciones -->
-        <div 
-          x-show="showCollectionModal"
-          @click.away="closeCollectionModal()"
-          class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50"
-          x-cloak
-        >
-          <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white" @click.stop>
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="text-lg font-medium text-gray-900">Administrar colecciones</h3>
-              <button @click="closeCollectionModal()" class="text-gray-500 hover:text-gray-700">
-                <i class="fas fa-times"></i>
-              </button>
+        <div x-show="showCollectionModal" 
+             class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+             @click.self="closeCollectionModal">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold">Guardar en colección</h3>
+                    <button @click="closeCollectionModal" class="text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <!-- Formulario para nueva colección -->
+                <div x-show="showCreateForm" class="mb-6">
+                    <form @submit.prevent="createCollection">
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2" for="collectionName">
+                                Nombre de la colección
+                            </label>
+                            <input type="text" 
+                                   id="collectionName"
+                                   x-model="newCollectionName"
+                                   class="w-full px-3 py-2 border rounded-md"
+                                   required>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-gray-700 text-sm font-bold mb-2" for="collectionDescription">
+                                Descripción (opcional)
+                            </label>
+                            <textarea id="collectionDescription"
+                                      x-model="newCollectionDescription"
+                                      class="w-full px-3 py-2 border rounded-md"
+                                      rows="3"></textarea>
+                        </div>
+                        <div class="flex justify-end space-x-2">
+                            <button type="button"
+                                    @click="showCreateForm = false"
+                                    class="px-4 py-2 text-gray-600 hover:text-gray-800">
+                                Cancelar
+                            </button>
+                            <button type="submit"
+                                    class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                Crear
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Lista de colecciones existentes -->
+                <template x-if="!showCreateForm">
+                    <div>
+                        <button @click="showCreateForm = true"
+                                class="w-full mb-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center justify-center">
+                            <i class="fas fa-plus mr-2"></i>
+                            Nueva colección
+                        </button>
+
+                        <div class="space-y-2 max-h-60 overflow-y-auto">
+                            <template x-for="collection in userCollections" :key="collection.id">
+                                <button @click="addToCollection(collection.id)"
+                                        class="w-full px-4 py-2 text-left hover:bg-gray-100 rounded-md flex items-center">
+                                    <span x-text="collection.name" class="flex-grow"></span>
+                                </button>
+                            </template>
+                        </div>
+
+                        <div x-show="userCollections.length === 0" class="text-center text-gray-500 py-4">
+                            No tienes colecciones. ¡Crea una nueva!
+                        </div>
+                    </div>
+                </template>
             </div>
-            
-            <!-- Formulario de nueva colección -->
-            <form @submit.prevent="createCollection()" class="mb-4">
-              <div class="mb-4">
-                <input 
-                  type="text" 
-                  x-model="newCollectionName"
-                  placeholder="Nombre de la colección"
-                  class="w-full px-3 py-2 border rounded-md"
-                  required
-                >
-              </div>
-              <div class="mb-4">
-                <textarea 
-                  x-model="newCollectionDescription"
-                  placeholder="Descripción (opcional)"
-                  class="w-full px-3 py-2 border rounded-md"
-                  rows="3"
-                ></textarea>
-              </div>
-              <button 
-                type="submit"
-                class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600"
-                :disabled="isLoading"
-              >
-                <span x-text="isLoading ? 'Creando...' : 'Crear colección'"></span>
-              </button>
-            </form>
-          </div>
         </div>
         {{/if}}
     </div>

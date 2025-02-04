@@ -375,10 +375,35 @@ export async function getCollections(request, reply) {
       .get();
 
     const collections = [];
-    collectionsRef.forEach((doc) => {
-      collections.push({ id: doc.id, ...doc.data() });
-    });
 
+    for (const doc of collectionsRef.docs) {
+      const collection = { id: doc.id, ...doc.data() };
+
+      // Si la colección tiene imágenes, obtener sus URLs
+      if (collection.images && collection.images.length > 0) {
+        const imagePromises = collection.images.map(async (imageId) => {
+          const imageDoc = await request.server.firebase.adminDb
+            .collection('images')
+            .doc(imageId)
+            .get();
+
+          if (imageDoc.exists) {
+            return {
+              id: imageDoc.id,
+              ...imageDoc.data(),
+            };
+          }
+          return null;
+        });
+
+        const images = await Promise.all(imagePromises);
+        collection.images = images.filter((img) => img !== null);
+      }
+
+      collections.push(collection);
+    }
+
+    logger.info(`Obtenidas ${collections.length} colecciones con sus imágenes`);
     return reply.send({ collections });
   } catch (error) {
     logger.error('Error al obtener colecciones:', error);

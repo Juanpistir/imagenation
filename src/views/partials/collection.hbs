@@ -1,0 +1,39 @@
+<div class="max-w-4xl mx-auto px-4 py-8">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900" x-text="collection?.name || 'Colección'"></h1>
+    <p class="mt-2 text-gray-600" x-show="collection?.description" x-text="collection?.description"></p>
+    <p class="mt-2 text-sm text-gray-500" x-text="`${(collection?.images || []).length} imágenes`"></p>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+    <template x-for="collection in $store.profile.collections" :key="collection.id">
+      <a :href="`/collections/${collection.id}`" class="block bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-4">
+        <div class="aspect-w-16 aspect-h-9 mb-4">
+          <template x-if="collection.images && collection.images.length > 0">
+            <img :src="collection.images[0].url" 
+                 class="w-full h-48 object-cover rounded-lg" 
+                 :alt="collection.name"
+                 @load="$el.style.display='block'"
+                 @error="$el.style.display='none'">
+          </template>
+          <template x-if="!collection.images || collection.images.length === 0">
+            <div class="w-full h-48 bg-gray-100 rounded-lg flex items-center justify-center">
+              <span class="text-gray-400">Sin imágenes</span>
+            </div>
+          </template>
+        </div>
+        <h3 class="font-semibold text-lg mb-1" x-text="collection.name"></h3>
+        <p class="text-sm text-gray-500" x-text="`${(collection.images || []).length} imágenes`"></p>
+      </a>
+    </template>
+  </div>
+</div>
+
+<script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('collection', () => ({
+    collection: {{ collection }},
+    authState: Alpine.$store.auth
+  }));
+});
+</script>

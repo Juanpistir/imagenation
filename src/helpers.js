@@ -22,14 +22,26 @@ export const helpers = {
     return text;
   },
   formatDate: (date) => {
+    console.log('Raw timestamp:', date);
     if (!date) return '';
-    return new Date(date).toLocaleDateString('es-ES', {
+    
+    // Convertir Firebase Timestamp a Date si es necesario
+    let dateObj;
+    if (date && typeof date === 'object' && date.toDate) {
+      dateObj = date.toDate();
+    } else {
+      dateObj = new Date(date);
+    }
+
+    const formatted = dateObj.toLocaleDateString('es-ES', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     });
+    console.log('Formatted date:', formatted);
+    return formatted;
   },
   json: (context) => {
     return JSON.stringify(context, null, 2);
